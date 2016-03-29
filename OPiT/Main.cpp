@@ -15,6 +15,7 @@
 #include "PnPSolver.h"
 #include "PointProjection.h"
 #include "Converter.h"
+#include "VisualOdometry.h"
 
 #include <iostream>
 
@@ -24,12 +25,27 @@ using namespace cv;
 Mat LinearLSTriangulation(Point3d u, Matx34d P,	Point3d u1,	Matx34d P1);
 Mat_<double> IterativeLinearLSTriangulation(Point3d u, Matx34d P, Point3d u1, Matx34d P1);
 
+// initiate the vector input
+
+vector<Point2f> setInputOne();
+vector<Point2f> setInputTwo();
+
 int main(int argc, char** argv)
 {
 
 	//unsigned cts = thread::hardware_concurrency();
 	//cout << cts << " concurrent threads are supported\n";
 
+    //VISUAL ODOMETRY
+    VO visodo;
+    
+    char pathname[100];
+    sprintf(pathname, "/Users/januaditya/Workspace/_opencv/ocv-voup/images/raw/");
+    
+    visodo.setImagePath(pathname);
+    visodo.initParameter();
+    visodo.visualodometry();
+    
 	//MEASURE THE TIME
 	int64 now, then;
 	double  ticksPerSecond = cvGetTickFrequency()*1.0e6;
@@ -40,12 +56,17 @@ int main(int argc, char** argv)
 	calib.setVoVImagePoints();
 	calib.setVoVWorldPoints();
 	// Get the distortion coefficients by looking at image + world points, and the camera matrix initialized in the pose solver
-	Mat distcoeffs = calib.foo(solver1.getCameraMatrix());
+    
+    Mat distcoeffs;
+#ifdef DISTORT_ENABLE
+    distcoeffs = calib.foo(solver1.getCameraMatrix());
+#else
+    distcoeffs = Mat(1,5, CV_64FC1, 0.0);
+#endif
 
 	cout << "Starting first solver............." << endl << endl << endl;
-	
-	solver1.setImagePoints(vector<Point2f> { Point2d(397.210571, 145.146866), Point2d(650.494934, 129.172379), Point2d(519.567688, 131.898239), Point2d(531.834473, 267.480103), Point2d(239.835358, 207.141220),
-		Point2d(834.740051, 174.580566), Point2d(211.190155, 510.402740), Point2d(437.319458, 218.244186), Point2d(845.259948, 160.41391), Point2d(559.729248, 170.678528) });
+    
+    solver1.setImagePoints(setInputOne());
 	
 	solver1.setWorldPoints();
 	// Run the PnP Solver. All matrices and stuff will be set up after this.
@@ -55,15 +76,11 @@ int main(int argc, char** argv)
 	cout << "Starting second solver............." << endl << endl << endl;
 	// Take another image showing the same scene.
 	//  So the 2D image points will be different of course...
-	
-	
-	solver2.setImagePoints(vector<Point2f> { Point2d(490, 250), Point2d(668, 242), Point2d(578, 242), Point2d(582, 335), Point2d(380, 294), Point2d(793, 278), Point2d(367, 499), Point2d(521, 306), 
-		Point2d(806, 262), Point2d(604, 272) });
+    
+	solver2.setImagePoints(setInputTwo());
 	//  But the 3D world points will be the same.
 	solver2.setWorldPoints();
-
 	solver2.foo(1, distcoeffs);
-
 
 	cout << endl << endl << endl << endl << endl << endl;
 	cout << endl << endl << "camera 1 position: " << endl << solver1.getCameraPosition() << endl << "camera 2 position: " << endl << solver2.getCameraPosition() << endl;
@@ -108,8 +125,6 @@ int main(int argc, char** argv)
 	Point3d u1; u1.x = cam1Points[0].x; u1.y = cam1Points[0].y; u1.z = 1;
 	Mat_<double> X_ = IterativeLinearLSTriangulation(u, cam1, u1, cam2);
 	cout << X_ << endl;
-
-
 
 	
 	cout << endl << endl << endl << endl << endl << endl;
@@ -211,8 +226,6 @@ int main(int argc, char** argv)
 		waitKey(1);
 	}
 	
-	
-
 	return 0;
 }
 
@@ -316,4 +329,38 @@ static string type2str(int type)
 	r += (chans + '0');
 
 	return r;
+}
+
+vector<Point2f> setInputOne()
+{
+    vector<Point2f> input1;
+    input1.push_back(Point2d(397.210571, 145.146866));
+    input1.push_back(Point2d(650.494934, 129.172379));
+    input1.push_back(Point2d(519.567688, 131.898239));
+    input1.push_back(Point2d(531.834473, 267.480103));
+    input1.push_back(Point2d(239.835358, 207.141220));
+    input1.push_back(Point2d(834.740051, 174.580566));
+    input1.push_back(Point2d(211.190155, 510.402740));
+    input1.push_back(Point2d(437.319458, 218.244186));
+    input1.push_back(Point2d(845.259948, 160.413910));
+    input1.push_back(Point2d(559.729248, 170.678528));
+    
+    return input1;
+}
+
+vector<Point2f> setInputTwo()
+{
+    vector<Point2f> input2;
+    input2.push_back(Point2d(490, 250));
+    input2.push_back(Point2d(668, 242));
+    input2.push_back(Point2d(578, 242));
+    input2.push_back(Point2d(582, 335));
+    input2.push_back(Point2d(380, 294));
+    input2.push_back(Point2d(793, 278));
+    input2.push_back(Point2d(367, 499));
+    input2.push_back(Point2d(521, 306));
+    input2.push_back(Point2d(806, 262));
+    input2.push_back(Point2d(604, 272));
+    
+    return input2;
 }

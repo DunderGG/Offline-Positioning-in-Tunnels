@@ -4,6 +4,7 @@
 #include <opencv2/features2d.hpp>
 #include <initializer_list>
 #include <iostream>
+
 class PnPSolver
 {
 public:
@@ -28,17 +29,13 @@ public:
 	cv::Mat getRotationMatrix();
 	cv::Mat getTranslationMatrix();
 
-	
-
-	
-	
 	int foo(int verbal, cv::Mat distCoeffs);
 
 	cv::Mat cameraPose34;
 
 private:
 	cv::Mat cameraMatrix;
-	
+
 	std::vector<cv::Point2f> imagePoints, imagePoints2;
 	std::vector<cv::Point3f> worldPoints;
 

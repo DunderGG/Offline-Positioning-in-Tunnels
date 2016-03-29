@@ -67,7 +67,7 @@ int PnPSolver::foo(int verbalOutput, Mat distCoeffs)
 							//						of the rotation and translation vectors, respectively, and further optimizes them.
 		100,				// ITERATIONS COUNT, number of iterations
 		8,					// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
-		0.95,				// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
+		0.99,				// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
 		//100,				// INLIERS, number of inliers. If the algorithm at some stage finds more inliers than minInliersCount , it finishes.
 		inliers,			// INLIERS, output vector that contains indices of inliers in worldPoints and imagePoints.
 		CV_ITERATIVE);		// FLAGS, method for solving a PnP problem.
@@ -156,7 +156,8 @@ int PnPSolver::foo(int verbalOutput, Mat distCoeffs)
 	Mat coords2D = (Mat_<double>(3, 1) << 0, 0, 1);
 	
 	//cameraPosition = -1 * rMat.t() * tVec;
-	cameraPosition = rMat.t() * ((cameraMatrix.inv() * coords2D) - tVec);
+	//cameraPosition = rMat.t() * ((cameraMatrix.inv() * coords2D) - tVec);
+    cameraPosition = -1 * rMat.t() * tVec;
 
 	now = cvGetTickCount();
 	elapsedSecondsCPOS = (double)(now - then) / ticksPerSecond;
