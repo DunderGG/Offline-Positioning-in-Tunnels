@@ -181,7 +181,7 @@ int PnPSolver::foo(int verbalOutput)
 	p = Position in image coordinates (assume this is (0, 0, 1))
 	R = Rotation matrix    (R^t = R transposed)
 	t = translation vector
-								
+
 									      position = R.t * (K^-1 * (u, v, 1)) - t)
 
 	P = R^t (p-t)		Previously:	cameraPosition = rMat.t() * ((cameraMatrix.inv() * coords2D) - tVec);
@@ -192,13 +192,13 @@ int PnPSolver::foo(int verbalOutput)
 	Mat coords2D = (Mat_<double>(3, 1) << 0, 0, 1);
 
 	//cameraPosition = -1 * rMat.t() * tVec;
-	cameraPosition = rMat.t() * ((calib.getCameraMatrix().inv() * coords2D) - tVec); 
+	cameraPosition = rMat.t() * ((calib.getCameraMatrix().inv() * coords2D) - tVec);
 
-	
+
 
 	/*
 		Taken from: https://en.wikipedia.org/wiki/Essential_matrix#3D_points_from_corresponding_image_points
-	
+
 	Mat rMatRow1 = rMat.row(1), rMatRow3 = rMat.row(2);
 
 	Mat y = (Mat_<float>(1, 3) << VoVImagePoints[0][0].x, VoVImagePoints[0][0].y, 1.0f );
@@ -211,7 +211,7 @@ int PnPSolver::foo(int verbalOutput)
 
 		SUPER WEIRD RESULTS
 			Guess some of the matrices are used incorrectly.
-	
+
  	Mat Z1 = ( (rMatRow1 - (VoVImagePoints[1][0].x * rMatRow3))  * tVec);
 	//cout << "Z1 = " << Z1 << endl;
 	Mat Z2 = (Mat_<float>(1, 3)); Z2 = ((rMatRow1 - (VoVImagePoints[1][0].x * rMatRow3))  * y.t());
@@ -310,7 +310,6 @@ void PnPSolver::setWorldPoints()
 	PnPSolver::worldPoints.push_back(Point3d(143437.223, 6394361.204, 39.037));
 	PnPSolver::worldPoints.push_back(Point3d(143432.753, 6394362.541, 39.446));
 
-
 	/*
 	PnPSolver::worldPoints.push_back(Point3d(143469.613, 6394456.418, 38.800));
 	PnPSolver::worldPoints.push_back(Point3d(143468.953, 6394441.302, 37.281));
@@ -390,7 +389,7 @@ void PnPSolver::setVoVImagePoints()
 	imagepoints.push_back(Point2d(834.740051, 174.580566));
 	imagepoints.push_back(Point2d(211.190155, 510.402740));
 	imagepoints.push_back(Point2d(437.319458, 218.244186));
-	imagepoints.push_back(Point2d(845.259948, 160.41391));
+	imagepoints.push_back(Point2d(845.259948, 160.413910));
 	imagepoints.push_back(Point2d(559.729248, 170.678528));
 
 	vector<Point2d> imagepoints2;

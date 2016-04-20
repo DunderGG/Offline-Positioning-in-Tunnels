@@ -32,7 +32,6 @@
 using namespace std;
 using namespace cv;
 
-
 int main(int argc, char** argv)
 {
 	const float THRESHOLD = 0.01f;
@@ -42,7 +41,7 @@ int main(int argc, char** argv)
 	PnPSolver solver1, solver2;
 	VO vodometry;
     FeatureDetection fdetect;
-    
+
     Mat distCoeffs = calib.getDistortionCoeffs();
 
 #ifndef KITTI_DATASET
@@ -50,16 +49,15 @@ int main(int argc, char** argv)
 #else
     char pathname[100] = "/Users/januaditya/Thesis/exjobb-data/kitti-odometry/dataset/sequences/00/image_0/";
 #endif
-    
+
     // CHECKING THE IMAGE QUALITY PER DIFFERENT FEATURE DETECTION
-//    fdetect.computeKeypointsAndDraw(pathname);
-    
+    // fdetect.computeKeypointsAndDraw(pathname);
+
     // VISUAL ODOMETRY
     //vodometry.initParameter();
     //vodometry.setImagePath(pathname);
     //vodometry.visualodometry();
 
-    
     // MANUAL CORRESPONDENCES PNP SOLVER
 	cout << "Starting first solver............." << endl << endl << endl;
 
@@ -131,25 +129,25 @@ int main(int argc, char** argv)
 	vector<double> bestPoint{ 0, 0, 0, 1000 };
 
 	vector<Point2d> imagepoints = solver1.getVoVImagePoints()[0];
-	
+
 	for(Point2d point : imagepoints)
-	{ 
+	{
 		for (double i = 20; i < 30; i+=.1)
 		{
 			/*
-			*	Take the image coordinates (X and Y) of the feature point, 
+			*	Take the image coordinates (X and Y) of the feature point,
 			*		together with i which represents going "one step further" on the ray.
-			*/ 
+			*/
 			p = (Mat_<double>(3, 1) << i*point.x, i*point.y, i);
 
-		
+
 			/*
 			*	We use the inverse camera matrix (K) to bring the image coordinate from the
 			*		Image coordinate system
 			*	to
 			*		Camera coordinate system
 			*
-			*		
+			*
 			*/
 			p = K.inv() * p;
 
@@ -162,7 +160,7 @@ int main(int argc, char** argv)
 
 
 			/*
-			*	We use our 4x4 transformation matrix (T), which is equal to our camera pose matrix, 
+			*	We use our 4x4 transformation matrix (T), which is equal to our camera pose matrix,
 			*		to bring the point from the
 			*			Camera coordinate system
 			*		to
@@ -203,10 +201,7 @@ int main(int argc, char** argv)
 			<< "DIST = \t"	<< bestPoint[3] << endl;
 		cout << "*****************************\n\n\n\n\n";
 	}
-	
-	
-	
-	
+    
 	/*
 	// Skeleton code for iterating through the image sequence
 	while (vc.read(frame2))

@@ -1,5 +1,9 @@
 #check for the mininum version of cmake
-cmake_minimum_required (VERSION 2.8 FATAL_ERROR)
+cmake_minimum_required (VERSION 3.0 FATAL_ERROR)
+
+#set compiler flag to C++11
+set (CMAKE_CXX_COMPILER "/usr/bin/clang++")
+set (CMAKE_CXX_FLAGS    "-std=c++11 -stdlib=libc++ -g -Wall")
 
 #project name
 project (OPiT)
@@ -29,10 +33,6 @@ list (REMOVE_ITEM src_files ${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp)
 
 #compile flag
 # add_definitions(-DKITTI_DATASET)
-
-if (__APPLE__)
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x")
-endif()
 
 #build the library for the source files
 add_library (src ${src_files})
