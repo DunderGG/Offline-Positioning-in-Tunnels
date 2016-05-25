@@ -174,7 +174,7 @@ int main(int argc, char** argv)
 	
 
 	Calibration calib;
-	PnPSolver solver1;
+	PnPSolver solver1(1000, 5, 0.99);
 	FeatureDetection fdetect;
 
 	
@@ -238,7 +238,7 @@ int main(int argc, char** argv)
 		begin = std::chrono::high_resolution_clock::now();
 		cout << "Performing matching... ";
 		vector<vector<DMatch> > matches;
-		fdetect.bfMatcher(descriptors1, tunnelDescriptors, matches);
+		fdetect.bfMatcher(tunnelDescriptors, descriptors1, matches);
 
 		/* 
 			 Retrieve the matched indices for the matched descriptors so we know which ones to use in the next step.
