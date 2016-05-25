@@ -38,6 +38,11 @@ public:
     // return some val
     float getSiftMatchingRatio ();
 
+    // method for compute features, matching with lookup table and RANSAC
+    void computeFeaturesAndMatching(cv::Mat img, std::vector<cv::Point2d> tunnel2D, std::vector<cv::Point3d> tunnel3D, cv::Mat tunnelDescriptor, int frameCounter,
+                                    std::vector<cv::KeyPoint> *detectedkpts, cv::Mat *descriptor,
+                                    std::vector<cv::Point2d> *retrieved2D, std::vector<cv::Point3d> *retrieved3D);
+
 private:
     // pointer to the feature point detector object
     cv::Ptr<cv::FeatureDetector> siftdetect_;

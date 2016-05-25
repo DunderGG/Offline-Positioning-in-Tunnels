@@ -32,7 +32,7 @@ FeatureDetection::FeatureDetection()
 	// surf
 	min_hessian = 200;
 	octave_layer = 3;
-	contrast_threshold = 0.02;			// default 0.04, lower value more features
+	contrast_threshold = 0.01;			// default 0.04, lower value more features
 	edge_threshold = 10;				// default 10, higher value more features
 	sigma = 1.6;
 
@@ -223,10 +223,10 @@ void FeatureDetection::siftExtraction (cv::Mat img, std::vector<cv::KeyPoint> de
     siftdetect_->compute(img, detectedPoints, descriptor);
 }
 
-void FeatureDetection::bfMatcher (cv::Mat trainDesc, cv::Mat queryDesc, std::vector<std::vector<DMatch> > &matches)
+void FeatureDetection::bfMatcher (cv::Mat queryDesc, cv::Mat trainDesc, std::vector<std::vector<DMatch> > &matches)
 {
 	// matching using BF L2
-	matcher_->knnMatch(queryDesc, trainDesc, matches, 100);
+	matcher_->knnMatch(queryDesc, trainDesc, matches, 200);
 }
 
 void FeatureDetection::drawKeypoints (cv::Mat img, std::vector<cv::KeyPoint> detectedPoints, cv::Mat &output)
@@ -241,4 +241,72 @@ void FeatureDetection::drawKeypoints (cv::Mat img, std::vector<cv::KeyPoint> det
 float FeatureDetection::getSiftMatchingRatio ()
 {
     return sift_matching_ratio;
+}
+
+void FeatureDetection::computeFeaturesAndMatching(Mat img, vector<Point2d> tunnel2D, vector<Point3d> tunnel3D, Mat tunnelDescriptor, int frameCounter,
+                                                  vector<KeyPoint> *detectedkpts, Mat *descriptor,
+                                                  vector<Point2d> *retrieved2D, vector<Point3d> *retrieved3D)
+{
+    Mat img_maskUpperPart = Mat::zeros(img.size(), CV_8U);
+    Mat img_roiUpperPart (img_maskUpperPart, Rect(0, 0, img.cols, img.rows/2));
+    img_roiUpperPart = Scalar(255, 255, 255);
+	Mat img_maskRightPart = Mat::zeros(img.size(), CV_8U);
+	Mat img_roiRightPart (img_maskRightPart, Rect(img.cols*3/5, img.rows/2, img.cols*2/5, img.rows*2/5));
+	img_roiRightPart = Scalar(255, 255, 255);
+	Mat img_combinedMask = img_maskUpperPart | img_maskRightPart;
+    this->siftDetector(img, *detectedkpts, img_combinedMask);
+    this->siftExtraction(img, *detectedkpts, *descriptor);
+    vector<vector<DMatch> > matches;
+    this->bfMatcher(tunnelDescriptor, *descriptor, matches);
+    vector<int> matchedIndices;
+    vector<int> matchedXYZ;
+    vector<Point2d> lutPt, framePt;
+    vector<DMatch> goodMatches,goodMatches2;
+    for (int i = 0; i < matches.size(); ++i)
+    {
+        DMatch first  = matches[i][0];
+        auto dist1 = matches[i][0].distance;
+        auto dist2 = matches[i][1].distance;
+        if(dist1 < this->getSiftMatchingRatio() * dist2)
+        {
+            goodMatches.push_back(first);
+            matchedIndices.push_back(first.trainIdx);
+            matchedXYZ.push_back(first.queryIdx);
+            framePt.push_back((*detectedkpts)[first.trainIdx].pt);
+            lutPt.push_back(tunnel2D[first.queryIdx]);
+        }
+    }
+
+    // --------------------------------------------------------ransac
+    if (frameCounter > 0)
+    {
+        vector<uchar> state;
+        findFundamentalMat(lutPt, framePt, FM_RANSAC, 1, 0.99, state);
+        vector<Point2d> lutPtRefined, framePtRefined;
+        for (size_t i = 0; i < state.size(); ++i)
+        {
+            if (state[i] != 0)
+            {
+                goodMatches2.push_back(goodMatches[i]);
+                matchedIndices.push_back(goodMatches[i].trainIdx);
+                matchedXYZ.push_back(goodMatches[i].queryIdx);
+                lutPtRefined.push_back(lutPt[i]);
+                framePtRefined.push_back(framePt[i]);
+            }
+        }
+
+        cout << "num of RAW matches (SIFT ratio)    : " << goodMatches.size() << endl;
+        cout << "num of REF matches (RANSAC)        : " << goodMatches2.size() << endl;
+        cout << "num of removed outliers            : " << goodMatches.size()-goodMatches2.size() << endl;
+        cout << "outliers in percent (%)            : " << (double)(goodMatches.size()-goodMatches2.size())/(double)goodMatches.size()*100 << endl;
+        cout << "inliers in percent (%)             : " << 100 - (double)(goodMatches.size()-goodMatches2.size())/(double)goodMatches.size()*100 << endl;
+    }
+    // --------------------------------------------------------ransac
+
+    (*retrieved2D).clear(); (*retrieved3D).clear();
+    for (int i = 0; i< matchedIndices.size(); i++)
+    {
+        (*retrieved2D).push_back(Point2d((*detectedkpts)[matchedIndices[i]].pt.x,(*detectedkpts)[matchedIndices[i]].pt.y));
+        (*retrieved3D).push_back(Point3d(tunnel3D[matchedXYZ[i]].x,tunnel3D[matchedXYZ[i]].y,tunnel3D[matchedXYZ[i]].z));
+    }
 }

@@ -12,13 +12,15 @@ else()
     set (LIB_SOURCES    ./source/Calibration.cpp
                         ./source/Converter.cpp
                         ./source/FeatureDetection.cpp
-                        ./source/MainWrapper.cpp
                         ./source/ManualCorrespondences.cpp
                         ./source/PCLCloudSearch.cpp
                         ./source/PnPSolver.cpp
                         ./source/PointProjection.cpp
                         ./source/Reprojection.cpp
                         ./source/Triangulation.cpp
-                        ./source/VisualOdometry.cpp)
+                        ./source/VisualOdometry.cpp
+                        ./source/Common.cpp
+                        ./source/Log.cpp
+                        ./source/BundleAdjust.cpp)
     add_library (shared ${LIB_SOURCES})
 endif()

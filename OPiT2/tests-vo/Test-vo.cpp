@@ -1,8 +1,16 @@
 #include <iostream>
 #include <fstream>
+
+#include <opencv2/features2d.hpp>
+#include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/videoio.hpp>
+#include <opencv2/opencv.hpp>
+
 #include "VisualOdometry.h"
+#include "PCLCloudSearch.h"
 
 using namespace std;
+using namespace cv;
 
 int main ()
 {
@@ -13,10 +21,10 @@ int main ()
     #endif
 
     // VISUAL ODOMETRY
-    VO vodometry;
-    vodometry.initParameter();
-    vodometry.setImagePath(pathname);
-    vodometry.visualodometry();
+     VO vodometry;
+     vodometry.initParameter();
+     vodometry.setImagePath(pathname);
+     vodometry.visualodometry();
 
     return 0;
 }

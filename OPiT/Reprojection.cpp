@@ -34,10 +34,10 @@ using namespace cv;
 */
 vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree)
 {
-    const double THRESHOLD = 0.25;
-    const double MIN_DIST = 1.0;
-    const double MAX_DIST = 100.0;
-    const double DELTA_Z = 0.05;
+    const double THRESHOLD = 0.0025;
+    const double MIN_DIST = 3.0;
+    const double MAX_DIST = 60.0;
+    const double DELTA_Z = 0.1;
 
     vector<double> bestPoint{ 0, 0, 0, 1000 };
     Mat p, p_, p3d;
@@ -99,16 +99,15 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
         {
             // return the lerp
             bestPoint = LinearInterpolation (newPoint, origin_w, p_);
-			//bestPoint = { newX,newY,newZ };
             break;
         }
 		//
 		//vector<double> origWorldPoint = { origin_w.at<double>(0, 0),  origin_w.at<double>(1, 0), origin_w.at<double>(2, 0) };
 		//vector<double> newWorldPoint = { newPoint[0], newPoint[1], newPoint[2] };
 		//double l2_lerp = cv::norm(newWorldPoint, origWorldPoint, cv::NORM_L2);
-		
+
 		//newPoint = LinearInterpolation(newPoint, origin_w, p_); newPoint.push_back(1);
-		
+
 		//Convert back to camera coordinates
 		//Mat newPointMat = Mat(4, 1, CV_64F); newPointMat.at<float>(0, 0) = newPoint[0]; newPointMat.at<float>(1, 0) = newPoint[1]; newPointMat.at<float>(2, 0) = newPoint[2];
 		//Mat newPointMatCamera = T.inv() * newPointMat;
@@ -119,7 +118,7 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 		//newPointMatImage = K * newPointMatImage;
 
 		//cout << newPointMatImage;
-		
+
 		//if(i == MIN_DIST)
 		//	i += ((sqrt(newPoint[3])/2) - DELTA_Z);
 
@@ -129,7 +128,7 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 }
 
 // using radius instead
-vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree)
+vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::KdTreeFLANN<pcl::PointXYZ> &kdtree)
 {
 	double MIN_DIST = 1.0f;			// in pixel
 	double MAX_DIST = 50.0f;		// in pixel
@@ -184,7 +183,7 @@ vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint,
 
         newX = sPoint.at<double>(0,0); newY = sPoint.at<double>(1,0), newZ = sPoint.at<double>(2,0);
         bestPoint = PCLCloudSearch::FindClosestPointRadius(	newX, newY, newZ, RADIUS, THRESHOLD,
-                                                            cloud, kdtree,
+                                                            std::ref(cloud), std::ref(kdtree),
                                                             origin_w);
 
 		// return current bestPoint to the upper stack if the lerp distance is less than 1000.0f (default)

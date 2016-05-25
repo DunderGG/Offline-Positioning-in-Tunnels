@@ -13,7 +13,7 @@ class PCLCloudSearch
 {
 public:
 	static std::vector<double> FindClosestPoint(double,double,double, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree);
-    static std::vector<double> FindClosestPointRadius(double,double,double,double,double, pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::KdTreeFLANN<pcl::PointXYZ>, cv::Mat);
+    static std::vector<double> FindClosestPointRadius(double,double,double,double,double, pcl::PointCloud<pcl::PointXYZ>::Ptr&, pcl::KdTreeFLANN<pcl::PointXYZ>&, cv::Mat);
 	static void VoxelizeCloud (pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr cloudFiltered);
 private:
 };

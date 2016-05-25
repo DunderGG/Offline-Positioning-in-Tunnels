@@ -36,12 +36,22 @@ PnPSolver::PnPSolver()
 {
 	setWorldPoints();
 	setVoVImagePoints();
+}
 
+PnPSolver::PnPSolver(int iterCount, int repError, double confidence)
+{
+	setWorldPoints();
+	setVoVImagePoints();
+	paramIterCount  = iterCount;
+	paramRepError   = repError;
+	paramConfidence = confidence;
+}
 
-
-
-
-
+void PnPSolver::setPnPParam(int iterCount, int repError, double confidence)
+{
+	paramIterCount  = iterCount;
+	paramRepError   = repError;
+	paramConfidence = confidence;
 }
 
 int PnPSolver::run(int verbalOutput)
@@ -93,151 +103,152 @@ int PnPSolver::run(int verbalOutput)
 		tVec,						// Output translation vector
 		false,						// USE EXTRINSIC GUESS, if true (1), the function uses the provided rvec and tvec values as initial approximations
 									//						of the rotation and translation vectors, respectively, and further optimizes them.
-		1000,						// ITERATIONS COUNT, number of iterations
-		5,							// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
-		0.99,						// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
+		paramIterCount,				// ITERATIONS COUNT, number of iterations
+		paramRepError,				// REPROJECTION ERROR, inlier threshold value used by the RANSAC procedure.
+		paramConfidence,			// CONFIDENCE, The probability that the algorithm produces a useful result. default 0.99;
 									//100,				// INLIERS, number of inliers. If the algorithm at some stage finds more inliers than minInliersCount , it finishes.
 		inliers,					// INLIERS, output vector that contains indices of inliers in worldPoints and imagePoints.
-		SOLVEPNP_EPNP);				// FLAGS, method for solving a PnP problem.
+		SOLVEPNP_ITERATIVE);				// FLAGS, method for solving a PnP problem.
 
-	//Create the rotation matrix from the vector created above, by using the "Rodrigues"
-	rMat.create(3, 3, DataType<double>::type);
-	Rodrigues(rVec, rMat);
-	//Create the translation matrix from the vector created above, by using the "Rodrigues"
-	tMat.create(3, 3, DataType<double>::type);
-	Rodrigues(tVec, tMat);
+		//Create the rotation matrix from the vector created above, by using the "Rodrigues"
+		rMat.create(3, 3, DataType<double>::type);
+		Rodrigues(rVec, rMat);
+		//Create the translation matrix from the vector created above, by using the "Rodrigues"
+		tMat.create(3, 3, DataType<double>::type);
+		Rodrigues(tVec, tMat);
 
-	//Instead of only keeping the 4x4 pose matrix, also keep the 3x4
-	cameraPose34.create(3, 4, rMat.type());
-	// Copies the rotation matrix into the camera pose
-	cameraPose34(Range(0, 3), Range(0, 3)) = rMat.t();
-	//Copies tvec into the camera pose
-	cameraPose34(Range(0, 3), Range(3, 4)) = -(rMat.t()) * tVec;
+		//Instead of only keeping the 4x4 pose matrix, also keep the 3x4
+		cameraPose34.create(3, 4, rMat.type());
+		// Copies the rotation matrix into the camera pose
+		cameraPose34(Range(0, 3), Range(0, 3)) = rMat.t();
+		//Copies tvec into the camera pose
+		cameraPose34(Range(0, 3), Range(3, 4)) = -(rMat.t()) * tVec;
 
-	/*
-	*  Create the camera pose matrix
-	*
-	*		The [R | t] (3x4) matrix is the extrinsic matrix,
-	*			 it describes how the world is transformed relative to the camera
-	*				(how to go from world to image, or image to world coordinates).
-	*/
-	cameraPose.create(4, 4, rMat.type());
-	//Copies the rotation matrix into the camera pose
-	cameraPose(Range(0, 3), Range(0, 3)) = rMat.t();
-	//Copies tvec into the camera pose
-	cameraPose(Range(0, 3), Range(3, 4)) = -(rMat.t()) * tVec;
-	// Fill the last row of the camera pose matrix with [0, 0, 0, 1]
-	double *p = cameraPose.ptr<double>(3);
-	p[0] = p[1] = p[2] = 0; p[3] = 1;
-
-
-
-	/* undistortPoints giving some funny results, not sure how to use it
-
-	vector<Point2f> uImagePoints;
-
-	undistortPoints(projectedImagePoints, uImagePoints, cameraMatrix, distCoeffs);
-
-	cout << endl << endl << "******************************************" << endl;
-	cout << "image points \t\t undistorted points" << endl;
-	for (int i = 0; i < uImagePoints.size(); i++)
-	{
-		cout << imagePoints.at(i) << "\t" << uImagePoints.at(i) << endl;
-	}
-	cout << "******************************************" << endl;
-	*/
+		/*
+		*  Create the camera pose matrix
+		*
+		*		The [R | t] (3x4) matrix is the extrinsic matrix,
+		*			 it describes how the world is transformed relative to the camera
+		*				(how to go from world to image, or image to world coordinates).
+		*/
+		cameraPose.create(4, 4, rMat.type());
+		//Copies the rotation matrix into the camera pose
+		cameraPose(Range(0, 3), Range(0, 3)) = rMat.t();
+		//Copies tvec into the camera pose
+		cameraPose(Range(0, 3), Range(3, 4)) = -(rMat.t()) * tVec;
+		// Fill the last row of the camera pose matrix with [0, 0, 0, 1]
+		double *p = cameraPose.ptr<double>(3);
+		p[0] = p[1] = p[2] = 0; p[3] = 1;
 
 
 
+		/* undistortPoints giving some funny results, not sure how to use it
 
-	/*	Equation taken from: http://stackoverflow.com/questions/22389896/finding-the-real-world-coordinates-of-an-image-point
+		vector<Point2f> uImagePoints;
 
-	P = Position in world coordinates (assume this is (x, y, z, 1))
-	p = Position in image coordinates (assume this is (0, 0, 1))
-	R = Rotation matrix    (R^t = R transposed)
-	t = translation vector
+		undistortPoints(projectedImagePoints, uImagePoints, cameraMatrix, distCoeffs);
 
-									      position = R.t * (K^-1 * (u, v, 1)) - t)
-
-	P = R^t (p-t)		Previously:	cameraPosition = rMat.t() * ((cameraMatrix.inv() * coords2D) - tVec);
-
-	Note that transposed rotation (R^t) does the inverse operation to original rotation but is much faster to calculate than  the inverse (R^-1).
-	*/
-	PnPSolver::cameraPosition.create(3, 1, DataType<double>::type);
-	Mat coords2D = (Mat_<double>(3, 1) << 0, 0, 1);
-
-	//cameraPosition = -1 * rMat.t() * tVec;
-	PnPSolver::cameraPosition = rMat.t() * ((calib.getCameraMatrix().inv() * coords2D) - tVec);
-
-	camPositions.push_back(PnPSolver::cameraPosition.clone());
-
-	/*
-		Taken from: https://en.wikipedia.org/wiki/Essential_matrix#3D_points_from_corresponding_image_points
-
-	Mat rMatRow1 = rMat.row(1), rMatRow3 = rMat.row(2);
-
-	Mat y = (Mat_<float>(1, 3) << VoVImagePoints[0][0].x, VoVImagePoints[0][0].y, 1.0f );
-	y.convertTo(y, CV_64FC1);
-	*/
+		cout << endl << endl << "******************************************" << endl;
+		cout << "image points \t\t undistorted points" << endl;
+		for (int i = 0; i < uImagePoints.size(); i++)
+		{
+			cout << imagePoints.at(i) << "\t" << uImagePoints.at(i) << endl;
+		}
+		cout << "******************************************" << endl;
+		*/
 
 
-	/*
-		From: http://www.nature.com/nature/journal/v293/n5828/pdf/293133a0.pdf
-
-		SUPER WEIRD RESULTS
-			Guess some of the matrices are used incorrectly.
-
- 	Mat Z1 = ( (rMatRow1 - (VoVImagePoints[1][0].x * rMatRow3))  * tVec);
-	//cout << "Z1 = " << Z1 << endl;
-	Mat Z2 = (Mat_<float>(1, 3)); Z2 = ((rMatRow1 - (VoVImagePoints[1][0].x * rMatRow3))  * y.t());
-	//cout << "Z2  = " << Z2 << endl;
-
-	Mat Z = Z1 / Z2;
 
 
-	Mat Y = Z * VoVImagePoints[0][0].y;
-	Mat X = Z * VoVImagePoints[0][0].x;
+		/*	Equation taken from: http://stackoverflow.com/questions/22389896/finding-the-real-world-coordinates-of-an-image-point
+
+		P = Position in world coordinates (assume this is (x, y, z, 1))
+		p = Position in image coordinates (assume this is (0, 0, 1))
+		R = Rotation matrix    (R^t = R transposed)
+		t = translation vector
+
+										      position = R.t * (K^-1 * (u, v, 1)) - t)
+
+		P = R^t (p-t)		Previously:	cameraPosition = rMat.t() * ((cameraMatrix.inv() * coords2D) - tVec);
+
+		Note that transposed rotation (R^t) does the inverse operation to original rotation but is much faster to calculate than  the inverse (R^-1).
+		*/
+		PnPSolver::cameraPosition.create(3, 1, DataType<double>::type);
+		Mat coords2D = (Mat_<double>(3, 1) << 0, 0, 0);
+
+		//cameraPosition = -1 * rMat.t() * tVec;
+		PnPSolver::cameraPosition = rMat.t() * ((calib.getCameraMatrix().inv() * coords2D) - tVec);
+
+		camPositions.push_back(PnPSolver::cameraPosition.clone());
+
+		/*
+			Taken from: https://en.wikipedia.org/wiki/Essential_matrix#3D_points_from_corresponding_image_points
+
+		Mat rMatRow1 = rMat.row(1), rMatRow3 = rMat.row(2);
+
+		Mat y = (Mat_<float>(1, 3) << VoVImagePoints[0][0].x, VoVImagePoints[0][0].y, 1.0f );
+		y.convertTo(y, CV_64FC1);
+		*/
 
 
-	cout << "Unprimed X Y Z = " << endl << X << endl << Y << endl << Z << endl << endl;
+		/*
+			From: http://www.nature.com/nature/journal/v293/n5828/pdf/293133a0.pdf
 
-	Mat XX = rMat * (X - tVec);
-	Mat YY = rMat * (Y - tVec);
-	Mat ZZ = rMat * (Z - tVec);
+			SUPER WEIRD RESULTS
+				Guess some of the matrices are used incorrectly.
 
-	cout << "Primed X Y Z = " << endl << XX << endl << endl << YY << endl << endl << ZZ << endl << endl;
-	*/
+	 	Mat Z1 = ( (rMatRow1 - (VoVImagePoints[1][0].x * rMatRow3))  * tVec);
+		//cout << "Z1 = " << Z1 << endl;
+		Mat Z2 = (Mat_<float>(1, 3)); Z2 = ((rMatRow1 - (VoVImagePoints[1][0].x * rMatRow3))  * y.t());
+		//cout << "Z2  = " << Z2 << endl;
+
+		Mat Z = Z1 / Z2;
 
 
-	if(verbalOutput)
-	{
-//		cout << endl << "***********************************************" << endl << endl;
-//
-//		cout << "Essential Matrix = " << endl << essentialMatrix << endl << endl;
-//
-//		cout << "Fundamental Matrix = " << endl << fundamentalMatrix << endl << endl;
-//
-//		cout << "CM =" << endl << calib.getCameraMatrix() << endl << endl;
-//
-//		cout << "R =" << endl << rMat << endl << endl;
-//
-//		cout << "T =" << endl << tMat << endl << endl;
-//
-//		cout << "t =" << endl << tVec << endl << endl;
-//
-		// cout << "Camera Pose = [" << cameraPose.at<double>(0,3) << ", "
-        //                           << cameraPose.at<double>(1,3) << ", "
-        //                           << cameraPose.at<double>(2,3) << "]" << endl;
+		Mat Y = Z * VoVImagePoints[0][0].y;
+		Mat X = Z * VoVImagePoints[0][0].x;
 
-		cout << "[" << cameraPose.at<double>(0,3) << ", "
-								  << cameraPose.at<double>(1,3) << ", "
-								  << cameraPose.at<double>(2,3) << "]" << endl;
 
-//		cout << "Camera Position = ["  << cameraPosition.at<double>(0) << ", "
-//									   << cameraPosition.at<double>(1) << ", "
-//									   << cameraPosition.at<double>(2) << "]" << endl;
+		cout << "Unprimed X Y Z = " << endl << X << endl << Y << endl << Z << endl << endl;
 
-#include <iomanip>
+		Mat XX = rMat * (X - tVec);
+		Mat YY = rMat * (Y - tVec);
+		Mat ZZ = rMat * (Z - tVec);
+
+		cout << "Primed X Y Z = " << endl << XX << endl << endl << YY << endl << endl << ZZ << endl << endl;
+		*/
+
+
+		if(verbalOutput)
+		{
+	//		cout << endl << "***********************************************" << endl << endl;
+	//
+	//		cout << "Essential Matrix = " << endl << essentialMatrix << endl << endl;
+	//
+	//		cout << "Fundamental Matrix = " << endl << fundamentalMatrix << endl << endl;
+	//
+	//		cout << "CM =" << endl << calib.getCameraMatrix() << endl << endl;
+	//
+	//		cout << "R =" << endl << rMat << endl << endl;
+	//
+	//		cout << "T =" << endl << tMat << endl << endl;
+	//
+	//		cout << "t =" << endl << tVec << endl << endl;
+	//
+			// cout << "Camera Pose = [" << cameraPose.at<double>(0,3) << ", "
+	        //                           << cameraPose.at<double>(1,3) << ", "
+	        //                           << cameraPose.at<double>(2,3) << "]" << endl;
+
+			cout << "[" << std::fixed << setprecision(10)
+									  << cameraPose.at<double>(0,3) << ", "
+									  << cameraPose.at<double>(1,3) << ", "
+									  << cameraPose.at<double>(2,3) << "]" << endl;
+
+			// cout << "  camera rcal at frame-["  << cameraPosition.at<double>(0) << ", "
+            //                                     << cameraPosition.at<double>(1) << ", "
+            //                                     << cameraPosition.at<double>(2) << "]" << endl;
+
+	#include <iomanip>
 
 
 

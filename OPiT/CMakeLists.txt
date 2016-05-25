@@ -32,7 +32,7 @@ list (REMOVE_ITEM src_files ${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp)
 
 #set compiler flag to C++11
 set (CMAKE_CXX_COMPILER "/usr/bin/clang++")
-set (CMAKE_CXX_FLAGS    "-std=c++11 -stdlib=libc++ -O2")
+set (CMAKE_CXX_FLAGS    "-std=c++11 -stdlib=libc++ -g")
 
 #build the library for the source files
 add_library (src ${src_files})

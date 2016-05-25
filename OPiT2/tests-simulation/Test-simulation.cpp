@@ -16,6 +16,7 @@
 #include "PointProjection.h"
 #include "PCLCloudSearch.h"
 #include "Reprojection.h"
+#include "Common.h"
 
 #include <iostream>
 #include <fstream>
@@ -25,12 +26,11 @@
 #include <chrono>
 #include <mutex>
 
-#define STARTIDX                435             // frame start, it could be the previous frame or the latter one as long it finds a hit with LUT
-#define FINISHIDX               475             // last frame in the sequence
-#define SLIDINGWINDOWSIZE       3               // number of frames for sliding window, both LUT window and Bundle Adjustment
+#define STARTIDX                433             // frame start, it could be the previous frame or the latter one as long it finds a hit with LUT
+#define FINISHIDX               523             // last frame in the sequence
+#define SLIDINGWINDOWSIZE       1               // number of frames for sliding window, both LUT window and Bundle Adjustment
 #define NUMTHREADS              8               // http://stackoverflow.com/questions/1718465/optimal-number-of-threads-per-core
 #define STATICNTASK             480             // only for static task assignments to each threads. 480 tasks for each thread
-#define KEYPOINTSUPPERLIM       1200            // only for static mode and iff the keypoints are just too many
 #define DRAWKPTS                1               // mode for drawing keypoints within cv::Mat input image and save it to .png
 #define SEQMODE                 0               // mode for parallel threads or sequential
 // #define LOGMODE                 1               // mode for logging, uncomment if not using cmake
@@ -41,7 +41,7 @@ using namespace pcl;
 using namespace std::chrono;
 
 // global variable for tunnel GPS mapping
-//unordered_map<Mat, Point3f> tunnelLut;
+// unordered_map<Mat, Point3f> tunnelLut;
 vector<Point2d>        tunnel2D;
 vector<Point3d>        tunnel3D;
 vector<Point3d>        _3dTemp;             // found 3d world points
@@ -51,8 +51,6 @@ vector<int>            _slidingWindowSize;  // contains of last 5 frame's found 
 Mat                    tunnelDescriptor;
 mutex                  g_mutex;
 
-int tempCount = 0;
-void prepareMap (char* mapCoordinateFile, char* mapKeypointsFile);
 void mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
                 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,
                 int start, int end, int tidx);
@@ -60,29 +58,44 @@ void mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
 // THE MAIN START HERE
 int main (int argc, char *argv[])
 {
+    //all class objects
+    Calibration calib;
+    PnPSolver solver, solverRefined;
+    FeatureDetection fdetect;
+    Common com;
+
     //for logging
     ofstream logFile, logMatrix, correspondences, correspondencesRefined;
+
+    // process the input arguments if it's correct
+    int startFrame, lastFrame;
+    if (argc == 3)
+    {
+        startFrame = atoi(argv[1]);
+        lastFrame  = atoi(argv[2]);
+    }
+    else
+    {
+        startFrame = STARTIDX;
+        lastFrame = FINISHIDX;
+    }
+
+    cout << "starting the simulation starting at frame-" << startFrame << " to " << lastFrame << endl;
 
     //create directory for log
     if (LOGMODE)
     {
-        char logDir[100] = "log";
-        mkdir(logDir, 0777);
+        com.createDir("log");
 
         // create a file for logging posiions
         logFile.open ("./log/logPoses.txt", std::ios::out);
         logMatrix.open ("./log/logMatrix.txt", std::ios::out);
     }
 
-    //Calibration moved to its own class.
-    Calibration calib;
-	PnPSolver solver;
-    FeatureDetection fdetect;
-
     // 1. load pointcloud
     PointCloud<PointXYZ>::Ptr cloud(new PointCloud<PointXYZ>);
     io::loadPCDFile("gnistangtunneln-semifull-voxelized.pcd", *cloud);
-    std::cerr 	<< "PointCloud before filtering: " << cloud->width * cloud->height
+    std::cerr 	<< "pointcloud before filtering: " << cloud->width * cloud->height
                 << " data points (" << pcl::getFieldsList (*cloud) << ")" << std::endl;
 
     // prepare the kdtree
@@ -96,7 +109,7 @@ int main (int argc, char *argv[])
     sprintf(map2Dto3D, "/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT/ManualCorrespondences.txt");
     sprintf(mapDescrip,"/Users/januaditya/Thesis/exjobb-data/git/Offline-Positioning-in-Tunnels/OPiT/ManualCorrespondences.yml");
 
-    prepareMap(map2Dto3D, mapDescrip);
+    com.prepareMap(map2Dto3D, mapDescrip, ref(tunnel2D), ref(tunnel3D), ref(tunnelDescriptor));
 
     // 3. start the routing and initiate all variables
     char pathname[100] = "/Users/januaditya/Thesis/exjobb-data/volvo/out0/";
@@ -109,8 +122,8 @@ int main (int argc, char *argv[])
     Mat descTemp;
     int clearCounter = 0;
 
-    int idx = STARTIDX;
-    while (idx < FINISHIDX)
+    int idx = startFrame;
+    while (idx < lastFrame)
     {
         // init the logging, create a file, two for each frame index. one for initial pose and one for refined (after backprojection)
         if (LOGMODE)
@@ -123,8 +136,7 @@ int main (int argc, char *argv[])
         }
 
         // start timer
-        high_resolution_clock::time_point t1, t2;
-        t1 = high_resolution_clock::now();
+        com.startTimer();
 
         cout << "processing image-" << idx << "...";
 
@@ -135,27 +147,27 @@ int main (int argc, char *argv[])
         // 4.1 set the ROI (region of interest)
         // this mask is to take only 50% upper part of the image
         Mat img_maskUpperPart = Mat::zeros(img.size(), CV_8U);
-        Mat img_roiUpperPart (img_maskUpperPart, Rect(0, 0, img.cols, img.rows*2/5));
+        Mat img_roiUpperPart (img_maskUpperPart, Rect(0, 0, img.cols, img.rows*7/8));
         img_roiUpperPart = Scalar(255, 255, 255);
 
         // this mask is to take 25% of the bottom right part of the image
-        Mat img_maskRightPart = Mat::zeros(img.size(), CV_8U);
-        Mat img_roiRightPart (img_maskRightPart, Rect(img.cols*3/5, img.rows*2/5, img.cols*2/5, img.rows*2/5));
-        img_roiRightPart = Scalar(255, 255, 255);
+        // Mat img_maskRightPart = Mat::zeros(img.size(), CV_8U);
+        // Mat img_roiRightPart (img_maskRightPart, Rect(img.cols*3/5, img.rows*2/5, img.cols*2/5, img.rows*2/5));
+        // img_roiRightPart = Scalar(255, 255, 255);
 
         // combine the masks
-        Mat img_combinedMask = img_maskUpperPart | img_maskRightPart;
+        // Mat img_combinedMask = img_maskUpperPart | img_maskRightPart;
 
         // 5. perform sift feature detection and get kpt_i
         vector<KeyPoint> detectedkpts;
-        fdetect.siftDetector(img, detectedkpts, img_combinedMask);
+        fdetect.siftDetector(img, detectedkpts, img_maskUpperPart);
 
         // 6. perform sift feature extraction and get desc_i
         Mat descriptor;
         fdetect.siftExtraction(img, detectedkpts, descriptor);
 
         // 6.1 draw the features
-        if (DRAWKPTS && (idx == STARTIDX))
+        if (DRAWKPTS && (idx == startFrame))
         {
             vector<KeyPoint> detectedkptsnonROI;
             Mat descriptorNonROI;
@@ -175,6 +187,8 @@ int main (int argc, char *argv[])
         }
 
         // 7. match between
+        cout << "size of lookup table is " << tunnelDescriptor.rows << endl;
+
         vector<vector<DMatch> > matches;
         fdetect.bfMatcher(descriptor, tunnelDescriptor, matches);
 
@@ -189,7 +203,7 @@ int main (int argc, char *argv[])
             auto dist1 = matches[i][0].distance;
             auto dist2 = matches[i][1].distance;
 
-            // based on lowe's it's 0.8 * dist, however we're using 0.6 for now
+            // based on lowe's it's 0.8 * dist, however we're using 0.7 for now
             if(dist1 < fdetect.getSiftMatchingRatio() * dist2)
             {
                 matchedIndices.push_back(first.trainIdx);
@@ -216,13 +230,13 @@ int main (int argc, char *argv[])
             if (LOGMODE)
             {
                correspondences << std::fixed << setprecision(4)
-                         << "[" << tunnel3D[matchedXYZ[i]].x << ", "
-                                << tunnel3D[matchedXYZ[i]].y << ", "
-                                << tunnel3D[matchedXYZ[i]].z << "] " << std::flush;
+                               << tunnel3D[matchedXYZ[i]].x << ", "
+                               << tunnel3D[matchedXYZ[i]].y << ", "
+                               << tunnel3D[matchedXYZ[i]].z << ", " << std::flush;
 
                correspondences << std::fixed << setprecision(4)
-                         << "[" << detectedkpts[matchedIndices[i]].pt.x << ", "
-                                << detectedkpts[matchedIndices[i]].pt.y << "]\n" << std::flush;
+                               << detectedkpts[matchedIndices[i]].pt.x << ", "
+                               << detectedkpts[matchedIndices[i]].pt.y << "\n" << std::flush;
             }
         }
 
@@ -233,7 +247,7 @@ int main (int argc, char *argv[])
         solver.run(1);
 
         // 11. reproject all 2D keypoints to 3D
-        T = solver.getCameraPose().clone();
+        T = solver.getCameraPose().clone();                 // it is the camera center in world coordinates
         K = calib.getCameraMatrix();
 
         Mat R = solver.getRotationMatrix();
@@ -243,13 +257,13 @@ int main (int argc, char *argv[])
         if (LOGMODE)
         {
             // save the initial camera position
-            logFile << std::fixed << setprecision(4)
+            logFile << std::fixed << setprecision(10)
                     << T.at<double>(0,3) << ", "
                     << T.at<double>(1,3) << ", "
                     << T.at<double>(2,3) << ", " << std::flush;
 
             // save the initial Rotation and Translation matrices from PnP solver
-            logMatrix << std::fixed << setprecision(4)
+            logMatrix << std::fixed << setprecision(10)
                       << R.at<double>(0,0) << ", " << R.at<double>(0,1) << ", " << R.at<double>(0,2) << ", "
                       << R.at<double>(1,0) << ", " << R.at<double>(1,1) << ", " << R.at<double>(1,2) << ", "
                       << R.at<double>(2,0) << ", " << R.at<double>(2,1) << ", " << R.at<double>(2,2) << ", "
@@ -257,31 +271,31 @@ int main (int argc, char *argv[])
         }
 
         // 12. clear, timewindow for LUT is 5 frames
-        if ((clearCounter != 0) && (clearCounter % SLIDINGWINDOWSIZE == 0))
-        {
-            Mat temp;
+//        if ((clearCounter != 0) && (clearCounter % SLIDINGWINDOWSIZE == 0))
+//        {
+//            Mat temp;
+//
+//            // erase tunnel3D
+//            for (int i=0; i < _slidingWindowSize[0]; i++)
+//                tunnel3D.erase(tunnel3D.begin());
+//
+//            // copy the remaining last windowsize-1 descriptors in a temporary place
+//            if (temp.rows != 0)
+//                temp.release();
+//
+//            for (int i=_slidingWindowSize[0]; i < tunnelDescriptor.rows; i++)
+//                temp.push_back(tunnelDescriptor.row(i));
+//
+//            // release the descriptor
+//            tunnelDescriptor.release();
+//
+//            // copy back it again
+//            tunnelDescriptor = temp.clone();
+//        }
 
-            // erase tunnel3D
-            for (int i=0; i < _slidingWindowSize[0]; i++)
-                tunnel3D.erase(tunnel3D.begin());
-
-            // copy the remaining last windowsize-1 descriptors in a temporary place
-            if (temp.rows != 0)
-                temp.release();
-
-            for (int i=_slidingWindowSize[0]; i < tunnelDescriptor.rows; i++)
-                temp.push_back(tunnelDescriptor.row(i));
-
-            // release the descriptor
-            tunnelDescriptor.release();
-
-            // copy back it again
-            tunnelDescriptor = temp.clone();
-        }
-
-        _1dTemp.clear();
-        _2dTemp.clear();
-        _3dTemp.clear();
+        tunnel2D.clear();
+        tunnel3D.clear();
+        tunnelDescriptor.release();
 
         // 13. backprojecting all keypoints to the cloud
         if (SEQMODE)
@@ -304,8 +318,7 @@ int main (int argc, char *argv[])
                 // Push the pair into the lookup table if it's not zero
                 if ((_3dcoord.x > 0.0f) && (_3dcoord.y > 0.0f) && (_3dcoord.z > 0.0f))
                 {
-                    tempCount++;
-                    cout << "found a point...(" << tempCount << ") at px-" << counter << endl;
+                    cout << "found a point...(" << ") at px-" << counter << endl;
 
                     // 12. Update the LUT
                     tunnel3D.push_back(_3dcoord);
@@ -328,11 +341,7 @@ int main (int argc, char *argv[])
             int numtask;
 
             // if keypoints are too many
-            if (detectedkpts.size() > KEYPOINTSUPPERLIM)
-                numtask = KEYPOINTSUPPERLIM/NUMTHREADS;
-            // if keypoints are sufficient
-            else
-                numtask = floor(detectedkpts.size()/NUMTHREADS);
+            numtask = floor(detectedkpts.size()/NUMTHREADS);
 
             for (int tidx = 0; tidx < NUMTHREADS; tidx++)
             {
@@ -354,14 +363,15 @@ int main (int argc, char *argv[])
             _slidingWindowSize.push_back(_3dTemp.size());
         }
 
+
         // 14. redo the pnp solver, now using all found 3D points
         cout << "  now solving again using " << _2dTemp.size() << " keypoints ";
         cout << "and 3d correspondences" << endl;
 
         cout << "  refined pose at frame-" << idx << ": ";
-        solver.setImagePoints(_2dTemp);
-        solver.setWorldPoints(_3dTemp);
-        solver.run(1);
+        solverRefined.setImagePoints(_2dTemp);
+        solverRefined.setWorldPoints(_3dTemp);
+        solverRefined.run(1);
 
         // 15. check reprojection error of each backprojected world points
         vector<Point2d> reprojectedPixels;
@@ -383,6 +393,13 @@ int main (int argc, char *argv[])
             repError += sqrt(dx + dy);
         }
 
+        cout << "  accumulate reprojection error is " << repError << endl;
+        cout << "  avg reprojection error for " << _1dTemp.size() << " points is: " << repError/_1dTemp.size() << " px " << endl;
+
+
+        // 16. one of the optimization part
+
+
         // save the refined initial camera pose for frame-idx
         if (LOGMODE)
         {
@@ -390,13 +407,13 @@ int main (int argc, char *argv[])
             for (int i=0; i<_2dTemp.size(); i++)
             {
                 correspondencesRefined << std::fixed << setprecision(4)
-                << "["  << _3dTemp[i].x << ", "
-                << _3dTemp[i].y << ", "
-                << _3dTemp[i].z << "] " << std::flush;
+                                       << _3dTemp[i].x << ", "
+                                       << _3dTemp[i].y << ", "
+                                       << _3dTemp[i].z << ", " << std::flush;
 
                 correspondencesRefined << std::fixed << setprecision(4)
-                << "["  << _2dTemp[i].x << ", "
-                << _2dTemp[i].y << "]\n" << std::flush;
+                                       << _2dTemp[i].x << ", "
+                                       << _2dTemp[i].y << "\n" << std::flush;
             }
 
             // save the refined vehicle position, num of keypoints, num of backprojected points and reprojection errror
@@ -424,12 +441,13 @@ int main (int argc, char *argv[])
                       << t.at<double>(0)   << ", " << t.at<double>(1)   << ", " << t.at<double>(2)   << "\n" << std::flush;
         }
 
-        cout << "  avg reprojection error for " << _1dTemp.size() << " points is: " << repError/_1dTemp.size() << " px " << endl;
 
-        // 16. report the exec
-        t2 = high_resolution_clock::now();
-        auto duration1 = duration_cast<milliseconds>( t2 - t1 ).count();
-        cout << "  finish in " << duration1 << "ms (" << duration1/1000 << " sec)\n" << endl;
+        // 17. report the exec
+        com.reportTimer();
+
+
+        // 18. draw succesfully reprojected 2Ds
+
 
         //close the files
         if (LOGMODE)
@@ -438,56 +456,19 @@ int main (int argc, char *argv[])
            correspondencesRefined.close();
         }
 
-        // 17. end of the frame processing, go to next frame and increase the clear LUT counter
+        // 19. clear all temporary variables
+        _1dTemp.clear();
+        _2dTemp.clear();
+        _3dTemp.clear();
+
+        // increase necessary counter
         idx++;
-        clearCounter++;
+        // clearCounter++;
     }
 
     logFile.close();
 
     return 0;
-}
-
-void prepareMap (char* mapCoordinateFile, char* mapKeypointsFile)
-{
-    // load descriptor
-    string line;
-    ifstream mapFile;
-    mapFile.open(mapCoordinateFile);
-
-    double temp=0,a=0,b=0,x=0,y=0,z=0;
-
-    if (mapFile.is_open())
-    {
-        while (getline(mapFile, line) && !mapFile.eof())
-        {
-            istringstream in(line);
-
-            for (int i=0; i<5; i++)
-            {
-                in >> temp;
-
-                if (i==0)
-                    a = temp;
-                if (i==1)
-                    b = temp;
-                if (i==2)
-                    x = temp;
-                if (i==3)
-                    y = temp;
-                if (i==4)
-                    z = temp;
-            }
-            tunnel2D.push_back(Point2f(a,b));
-            tunnel3D.push_back(Point3f(x,y,z));
-        }
-    }
-    mapFile.close();
-
-    // load keypoints
-    cv::FileStorage lstorage(mapKeypointsFile, cv::FileStorage::READ);
-    lstorage["img"] >> tunnelDescriptor;
-    lstorage.release();
 }
 
 void mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
@@ -497,9 +478,10 @@ void mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
     vector <double> temp = {0,0,0,1000};
     Point3d _mp3dcoord;
 
-    for (int i=start; i<end; i+=4)
+    for (int i=start; i<end; i++)
     {
-        temp = Reprojection::backprojectRadius(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud, kdtree);
+        // temp = Reprojection::backprojectRadius(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud, kdtree);
+        temp = Reprojection::backproject(T, K, Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y), cloud, kdtree);
 
         // Define the 3D coordinate
         _mp3dcoord.x = temp[0];
@@ -515,15 +497,12 @@ void mpThread ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
                 tunnel2D.push_back(Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y));
                 tunnel3D.push_back(_mp3dcoord);
                 tunnelDescriptor.push_back(descriptor.row(i));
-                tempCount++;
-
-                // project again to check the reprojection error
 
                 // For verifying PnP
                 _3dTemp.push_back(_mp3dcoord);
                 _2dTemp.push_back(Point2d(imagepoint[i].pt.x,imagepoint[i].pt.y));
                 _1dTemp.push_back(i);
-                //cout << "      tidx-" << tidx << " - found a point at px-" << i << "(" << tempCount << ")" << endl;
+                //cout << "      tidx-" << tidx << " - found a point at px-" << i << endl;
             }
         }
         // else

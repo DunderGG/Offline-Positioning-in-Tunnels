@@ -8,6 +8,9 @@ class PnPSolver
 {
 public:
 	PnPSolver();
+	PnPSolver(int iterCount, int repError, double confidence);
+
+	void setPnPParam(int iterCount, int repError, double confidence);
 
 	void setWorldPoints();
 	void setWorldPoints(std::vector<cv::Point3d> WP);
@@ -50,6 +53,9 @@ private:
 	cv::Mat rMat, tMat;
 	cv::Mat cameraPose, cameraPosition;
 
+	int paramIterCount;
+	int paramRepError;
+	double paramConfidence;
 
 };
 

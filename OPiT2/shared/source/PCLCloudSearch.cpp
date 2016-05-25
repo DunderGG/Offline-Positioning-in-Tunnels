@@ -12,12 +12,8 @@
 #include "PCLCloudSearch.h"
 
 
-std::vector<double> PCLCloudSearch::FindClosestPoint(double x, double y, double z, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
+std::vector<double> PCLCloudSearch::FindClosestPoint(double x, double y, double z, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree)
 {
-	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
-
-	kdtree.setInputCloud(cloud);
-
 	pcl::PointXYZ searchPoint;
 
 	searchPoint.x = x;
@@ -56,27 +52,12 @@ std::vector<double> PCLCloudSearch::FindClosestPoint(double x, double y, double 
 		}
 	}
 
-	std::vector<int> pointIdxRadiusSearch;
-	std::vector<float> pointRadiusSquaredDistance;
-	float radius = 256.0f * rand () / (RAND_MAX + 1.0f);
-
-	if ( kdtree.radiusSearch (searchPoint, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0 )
-	{
-		for (size_t i = 0; i < pointIdxRadiusSearch.size (); ++i)
-	  	std::cout << "    "  <<   cloud->points[ pointIdxRadiusSearch[i] ].x
-	              << " " << cloud->points[ pointIdxRadiusSearch[i] ].y
-	              << " " << cloud->points[ pointIdxRadiusSearch[i] ].z
-	              << " (squared distance: " << pointRadiusSquaredDistance[i] << ")" << std::endl;
-	}
-
-	//
-
 	return bestPoint;
 }
 
 std::vector<double> PCLCloudSearch::FindClosestPointRadius(double x, double y, double z, double radius, double threshold,
-                                                           pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
-                                                           pcl::KdTreeFLANN<pcl::PointXYZ> kdtree,
+                                                           pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+                                                           pcl::KdTreeFLANN<pcl::PointXYZ> &kdtree,
                                                            cv::Mat origin)
 {
 	pcl::PointXYZ searchPoint;

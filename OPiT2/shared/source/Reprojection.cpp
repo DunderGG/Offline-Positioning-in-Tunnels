@@ -19,6 +19,14 @@
 using namespace std;
 using namespace cv;
 
+Reprojection::Reprojection(double thresh, double mind, double maxd, double delta)
+{
+	this->threshold = 0.01;
+	this->mindist   = 5;
+	this->maxdist  	= 150;
+	this->deltaz   	= 0.01;
+}
+
 Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec1, cv::Mat tVec2)
 {
 	Calibration calib;
@@ -99,8 +107,6 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 }
 
 
-
-
 /*
 *	Projection algorithm from: http://stackoverflow.com/questions/13957150/opencv-computing-camera-position-rotation
 *
@@ -114,12 +120,12 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 *	x = K * [R|t] * X
 *
 */
-vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
+vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::KdTreeFLANN<pcl::PointXYZ> &kdtree)
 {
-    const double THRESHOLD = 0.1;
-    const double MIN_DIST = 15.0;
-    const double MAX_DIST = 25.0;
-    const double DELTA_Z = 0.5;
+    double THRESHOLD 	= 0.05;
+    double MIN_DIST 	= 15;
+    double MAX_DIST 	= 60;
+    double DELTA_Z 		= 0.05;
 
     vector<double> bestPoint{ 0, 0, 0, 1000 };
     Mat p, p_, p3d;
@@ -174,7 +180,7 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
          *		for finding the closest neighbour (point) in the point cloud.
          */
         newX = p_.at<double>(0, 0);	newY = p_.at<double>(1, 0); newZ = p_.at<double>(2, 0);
-        vector<double> newPoint = PCLCloudSearch::FindClosestPoint(newX, newY, newZ, cloud);
+        vector<double> newPoint = PCLCloudSearch::FindClosestPoint(newX, newY, newZ, cloud, kdtree);
 
         /*
          *	As soon as we find a "good enough" point, return it,
@@ -193,14 +199,14 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 }
 
 // using radius instead
-vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::KdTreeFLANN<pcl::PointXYZ> kdtree)
+vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree)
 {
-	double MIN_DIST = 1.0f;			// in pixel
-	double MAX_DIST = 50.0f;		// in pixel
+	double MIN_DIST = 10.0f;			// in pixel
+	double MAX_DIST = 100.0f;		// in pixel
     double min_dist_L2;
     double max_dist_L2;
-	double RADIUS = 0.1f;			// meter
-	double THRESHOLD = 0.005f;		// meter
+	double RADIUS = 0.05f;			// 5 centimeter
+	double THRESHOLD = 0.01f;		// 1 centimeter
 	double DELTA_Z;					// meter
 
 	vector<double> bestPoint;
@@ -248,7 +254,7 @@ vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint,
 
         newX = sPoint.at<double>(0,0); newY = sPoint.at<double>(1,0), newZ = sPoint.at<double>(2,0);
         bestPoint = PCLCloudSearch::FindClosestPointRadius(	newX, newY, newZ, RADIUS, THRESHOLD,
-                                                            cloud, kdtree,
+                                                            std::ref(cloud), std::ref(kdtree),
                                                             origin_w);
 
 		// return current bestPoint to the upper stack if the lerp distance is less than 1000.0f (default)
@@ -283,14 +289,14 @@ vector<double> Reprojection::LinearInterpolation(vector<double> bestPoint, Mat o
 
     Mat output = origin + (vectorAP.dot(vectorAB) / vectorAB.dot(vectorAB)) * vectorAB;
 
-    if (false)
-    {
-        cout << endl;
-        cout << vectorAP << endl;
-        cout << vectorAB << endl;
-        cout << output << endl;
-        cout << "[" << bestPoint[0] << ";\n" << bestPoint[1] << ";\n" << bestPoint[2] << "]" << endl;
-    }
+    // if (false)
+    // {
+    //     cout << endl;
+    //     cout << vectorAP << endl;
+    //     cout << vectorAB << endl;
+    //     cout << output << endl;
+    //     cout << "[" << bestPoint[0] << ";\n" << bestPoint[1] << ";\n" << bestPoint[2] << "]" << endl;
+    // }
 
     return {output.at<double>(0), output.at<double>(1), output.at<double>(2)};
 }

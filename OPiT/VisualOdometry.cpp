@@ -14,8 +14,8 @@ using namespace std;
 using namespace cv;
 using namespace cv::xfeatures2d;
 
-#define STARTFRAME  333
-#define MAXFRAME    1000
+#define STARTFRAME  432
+#define MAXFRAME    532
 
 /*
     A class for implementing visual odometry.
@@ -120,7 +120,7 @@ void VO::findPoses(cv::Mat lastImage, std::vector<cv::Point2f>& points1, std::ve
     int thickness = 1;
     cv::Point textOrg(10, 50);
 
-    Mat matOut = Mat::zeros(960, 600, CV_64FC3);;
+    Mat matOut = Mat::zeros(960, 600, CV_64FC3);
 
     // window
     namedWindow("VO trajectory", WINDOW_AUTOSIZE);
@@ -206,7 +206,16 @@ void VO::featureDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::M
     // sift
     else if (vo_method == VO_METHOD_SIFT)
     {
-        siftDetection(img1, points1, img2, points2);
+        // frame mask
+        Mat img_maskUpperPart = Mat::zeros(img1.size(), CV_8U);
+        Mat img_roiUpperPart (img_maskUpperPart, Rect(0, 0, img1.cols, img1.rows/2));
+        img_roiUpperPart = Scalar(255, 255, 255);
+        Mat img_maskRightPart = Mat::zeros(img1.size(), CV_8U);
+        Mat img_roiRightPart (img_maskRightPart, Rect(img1.cols*3/5, img1.rows/2, img1.cols*2/5, img1.rows*2/5));
+        img_roiRightPart = Scalar(255, 255, 255);
+        Mat img_combinedMask = img_maskUpperPart | img_maskRightPart;
+
+        siftDetection(img1, points1, img_combinedMask, img2, points2, img_combinedMask);
     }
     // akaze
     else if (vo_method == VO_METHOD_AKAZE)
@@ -301,13 +310,26 @@ void VO::siftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat 
      }
 
     // convert
-    cv::KeyPoint::convert(matched1, points1, vector<int>());
-    cv::KeyPoint::convert(matched2, points2, vector<int>());
+    vector<Point2f> point1_ransac, point2_ransac;
+    point1_ransac.clear();
+    point2_ransac.clear();
+    cv::KeyPoint::convert(matched1, point1_ransac);
+    cv::KeyPoint::convert(matched2, point2_ransac);
 
     // detect inliers by using F matrix
     //kill outliers with ransac
-    vector<uchar> inliers(points1.size(),0);
-    findFundamentalMat(Mat(points1), Mat(points2), inliers, CV_FM_RANSAC, 3.f, 0.99f);
+    vector<uchar> state;
+    points1.clear();
+    points2.clear();
+    findFundamentalMat(point1_ransac, point2_ransac, FM_RANSAC, 1, 0.99, state);
+    for (size_t i = 0; i < state.size(); ++i)
+    {
+        if (state[i] != 0)
+        {
+            points1.push_back(point1_ransac[i]);
+            points2.push_back(point2_ransac[i]);
+        }
+    }
 }
 
 //SIFT with mask
@@ -341,13 +363,26 @@ void VO::siftDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat 
     }
 
     // convert
-    cv::KeyPoint::convert(matched1, points1, vector<int>());
-    cv::KeyPoint::convert(matched2, points2, vector<int>());
+    vector<Point2f> point1_ransac, point2_ransac;
+    point1_ransac.clear();
+    point2_ransac.clear();
+    cv::KeyPoint::convert(matched1, point1_ransac);
+    cv::KeyPoint::convert(matched2, point2_ransac);
 
     // detect inliers by using F matrix
     //kill outliers with ransac
-    vector<uchar> inliers(points1.size(),0);
-    findFundamentalMat(Mat(points1), Mat(points2), inliers, CV_FM_RANSAC, 3.f, 0.99f);
+    vector<uchar> state;
+    points1.clear();
+    points2.clear();
+    findFundamentalMat(point1_ransac, point2_ransac, FM_RANSAC, 1, 0.99, state);
+    for (size_t i = 0; i < state.size(); ++i)
+    {
+        if (state[i] != 0)
+        {
+            points1.push_back(point1_ransac[i]);
+            points2.push_back(point2_ransac[i]);
+        }
+    }
 }
 
 void VO::surfDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::Mat img2, std::vector<cv::Point2f>& points2)
@@ -488,8 +523,8 @@ void VO::drawPoints(cv::Mat img, std::vector<cv::Point2f>& points1, std::vector<
 
 void VO::initParameter()
 {
-    iterationsCount = 100;
-    reprojectionError = 8;
+    iterationsCount = 500;
+    reprojectionError = 3;
     confidence = 0.99;
     method = cv::RANSAC;
 
@@ -503,9 +538,9 @@ void VO::initParameter()
 
     // surf
     min_hessian = 200;
-    octave_layer = 4;
-    contrast_threshold = 0.005f;
-    edge_threshold = 10;
+    octave_layer = 3;
+    contrast_threshold = 0.004f;
+    edge_threshold = 20;
     sigma = 1.6;
 
     // sift

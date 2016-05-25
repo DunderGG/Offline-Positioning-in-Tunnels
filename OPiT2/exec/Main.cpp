@@ -40,7 +40,7 @@ int main(int argc, char** argv)
 
     ManualCorrespondences(entrance);
 
-    MainWrapper();
+    //MainWrapper();
 
     return 0;
 }
