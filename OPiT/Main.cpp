@@ -40,9 +40,9 @@
 using namespace std;
 using namespace cv;
 
-const int NR_OF_FRAMES = 50;
+const int NR_OF_FRAMES = 20;
 const int FIRST_INDEX = 430, LAST_INDEX = FIRST_INDEX + NR_OF_FRAMES;
-const int CLEARING_PERIODICITY = 5;
+const int CLEARING_PERIODICITY = 10;
 
 const int NUMBEROFTHREADS = 16;
 const bool PAR_MODE = true;
@@ -289,7 +289,7 @@ int main(int argc, char** argv)
 		cout << "Running solver... ";
 		solver1.setImagePoints(retrieved2D);
 		solver1.setWorldPoints(retrieved3D);
-		solver1.run(0);
+		solver1.run(1);
 		cout << "Done!" << endl << endl;
 		cout << "Camera Position:" << endl << solver1.getCameraPosition() << endl;
 		Mat T = solver1.getCameraPose().clone();
@@ -344,7 +344,14 @@ int main(int argc, char** argv)
 								end));
 			}
 			
-
+			// Join acts as a "wall", so that all threads finish before the main thread continues.
+			for (int l = 0; l < workers.size(); l++)
+			{
+				//cout << "Joining thread #" << workers[l].get_id() << endl;
+				if (workers[l].joinable())
+					workers[l].join();
+			}
+			workers.clear();
 		}
 
 
@@ -394,14 +401,7 @@ int main(int argc, char** argv)
 		}
 		//END OF BACKPROJECTION
 		
-		// Join acts as a "wall", so that all threads finish before the main thread continues.
-		for (int l = 0; l < workers.size(); l++)
-		{
-			//cout << "Joining thread #" << workers[l].get_id() << endl;
-			if (workers[l].joinable())
-				workers[l].join();
-		}
-		workers.clear();
+		
 
 		end = std::chrono::high_resolution_clock::now();
 		cout << "Done! (" << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "/" << std::chrono::duration_cast<std::chrono::milliseconds>(end - beginningOfMain).count() << " ms)" << endl << endl;

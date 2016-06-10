@@ -353,3 +353,6 @@ ModelManifest.xml
 /OPiT/logs/reprojectionBackup.txt
 /OPiT/logs/PnPSolverBackup.txt
 /OPiT/logs/mainBackup.txt
+/OPiT_Modeling/UMLSequenceDiagram1.sequencediagram.layout
+/OPiT_Modeling/UMLSequenceDiagram1.sequencediagram
+/CodeMap1.dgml

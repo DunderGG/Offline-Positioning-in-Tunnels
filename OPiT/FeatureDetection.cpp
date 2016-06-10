@@ -64,7 +64,7 @@ FeatureDetection::FeatureDetection()
 	surfextract_ = cv::xfeatures2d::SURF::create(min_hessian);
 
 	//matcher
-	matcher_ 	 = cv::BFMatcher::create("BruteForce");
+	matcher_ = BFMatcher::create("BruteForce");
 }
 
 

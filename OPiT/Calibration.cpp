@@ -62,7 +62,7 @@ Mat Calibration::foo( vector<vector<Point2f> > vovIP, vector<vector<Point3f> > v
 Mat Calibration::foo()
 {
 	// Before anything, we try to calibrate the camera
-	Mat distCoeffs = Mat::zeros(8, 1, CV_64F);
+	Calibration::distortionCoeffs = Mat::zeros(8, 1, CV_64F);
 	Mat cm; cameraMatrix.copyTo(cm);
 	Mat rvec, tvec;
 

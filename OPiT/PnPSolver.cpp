@@ -218,16 +218,15 @@ int PnPSolver::run(int verbalOutput)
 	        //                           << cameraPose.at<double>(1,3) << ", "
 	        //                           << cameraPose.at<double>(2,3) << "]" << endl;
 
-			cout << "[" << std::fixed << setprecision(10)
-									  << cameraPose.at<double>(0,3) << ", "
-									  << cameraPose.at<double>(1,3) << ", "
-									  << cameraPose.at<double>(2,3) << "]" << endl;
-
+			//cout << "[" << std::fixed << setprecision(10)
+			//						  << cameraPose.at<double>(0,3) << ", "
+			//						  << cameraPose.at<double>(1,3) << ", "
+			//						  << cameraPose.at<double>(2,3) << "]" << endl;
+			cout << cameraPose << endl;
 			// cout << "  camera rcal at frame-["  << cameraPosition.at<double>(0) << ", "
             //                                     << cameraPosition.at<double>(1) << ", "
             //                                     << cameraPosition.at<double>(2) << "]" << endl;
 
-	#include <iomanip>
 
 //		cout << endl << "***********************************************" << endl << endl;
 	}
