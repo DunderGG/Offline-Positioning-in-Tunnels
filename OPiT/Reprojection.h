@@ -9,14 +9,17 @@
 class Reprojection
 {
 public:
-	Reprojection();
+	Reprojection(double, double, double, double);
 
 	cv::Mat foo(cv::Mat,cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat);
 
-	static std::vector<double> backproject(cv::Mat T, cv::Mat K, cv::Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree);
+	static std::vector<double> backproject(cv::Mat T, cv::Mat K, cv::Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::KdTreeFLANN<pcl::PointXYZ> &kdtree);
     static std::vector<double> backprojectRadius(cv::Mat T, cv::Mat	K, cv::Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::KdTreeFLANN<pcl::PointXYZ> &kdtree);
     static std::vector<double> LinearInterpolation(std::vector<double> bestPoint, cv::Mat origin, cv::Mat vectorPoint);
 
 private:
-
+	double threshold;
+    double mindist;
+    double maxdist;
+    double deltaz;
 };

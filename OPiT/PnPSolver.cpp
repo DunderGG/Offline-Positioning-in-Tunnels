@@ -63,6 +63,22 @@ int PnPSolver::run(int verbalOutput)
 
 
 
+
+	/*
+	recoverPose() described here: http://docs.opencv.org/3.0-beta/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#recoverpose
+	*/
+	// recoverPose(
+	// 	essentialMatrix,
+	// 	VoVImagePoints[0],
+	// 	VoVImagePoints[1],
+	// 	R,
+	// 	t,
+	// 	cameraMatrix.at<double>(0, 0),
+	// 	Point2d(cameraMatrix.at<double>(0, 2), cameraMatrix.at<double>(1, 2)),
+	// 	mask
+	// 	);
+
+
 	Mat inliers;
 	/*
 	solvePnPRansac(): Finds an object pose from 3D-2D point correspondences using the RANSAC scheme.
@@ -124,6 +140,8 @@ int PnPSolver::run(int verbalOutput)
 		double *p = cameraPose.ptr<double>(3);
 		p[0] = p[1] = p[2] = 0; p[3] = 1;
 
+
+
 		/* undistortPoints giving some funny results, not sure how to use it
 
 		vector<Point2f> uImagePoints;
@@ -143,6 +161,7 @@ int PnPSolver::run(int verbalOutput)
 
 
 		/*	Equation taken from: http://stackoverflow.com/questions/22389896/finding-the-real-world-coordinates-of-an-image-point
+
 		P = Position in world coordinates (assume this is (x, y, z, 1))
 		p = Position in image coordinates (assume this is (0, 0, 1))
 		R = Rotation matrix    (R^t = R transposed)
@@ -159,6 +178,7 @@ int PnPSolver::run(int verbalOutput)
 
 		//cameraPosition = -1 * rMat.t() * tVec;
 		PnPSolver::cameraPosition = rMat.t() * ((calib.getCameraMatrix().inv() * coords2D) - tVec);
+
 		camPositions.push_back(PnPSolver::cameraPosition.clone());
 
 		/*
@@ -187,6 +207,7 @@ int PnPSolver::run(int verbalOutput)
 
 		Mat Y = Z * VoVImagePoints[0][0].y;
 		Mat X = Z * VoVImagePoints[0][0].x;
+
 
 		cout << "Unprimed X Y Z = " << endl << X << endl << Y << endl << Z << endl << endl;
 
@@ -226,6 +247,8 @@ int PnPSolver::run(int verbalOutput)
 			// cout << "  camera rcal at frame-["  << cameraPosition.at<double>(0) << ", "
             //                                     << cameraPosition.at<double>(1) << ", "
             //                                     << cameraPosition.at<double>(2) << "]" << endl;
+
+
 
 
 //		cout << endl << "***********************************************" << endl << endl;

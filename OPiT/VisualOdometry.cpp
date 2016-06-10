@@ -14,8 +14,8 @@ using namespace std;
 using namespace cv;
 using namespace cv::xfeatures2d;
 
-#define STARTFRAME  432
-#define MAXFRAME    532
+#define STARTFRAME  200
+#define MAXFRAME    700
 
 /*
     A class for implementing visual odometry.
@@ -38,11 +38,17 @@ VO::VO()											// WE HAVE TO TAKE DISTORTION INTO ACCOUNT!
     imageScale = 1.0f;
 
 #ifndef KITTI_DATASET
-	cameraMatrix.at<double>(0, 0) = 1432.f/imageScale;						// Focal length X				| fx  0  cx |
-	cameraMatrix.at<double>(1, 1) = 1432.f/imageScale;						// Focal length Y				| 0  fy  cy |
-	cameraMatrix.at<double>(0, 2) = 640.f/imageScale;						// Principal point X			| 0   0   1 |
-	cameraMatrix.at<double>(1, 2) = 481.f/imageScale;						// Principal point Y			---		  ---
+	// cameraMatrix.at<double>(0, 0) = 1432.f/imageScale;						// Focal length X				| fx  0  cx |
+	// cameraMatrix.at<double>(1, 1) = 1432.f/imageScale;						// Focal length Y				| 0  fy  cy |
+	// cameraMatrix.at<double>(0, 2) = 640.f/imageScale;						// Principal point X			| 0   0   1 |
+	// cameraMatrix.at<double>(1, 2) = 481.f/imageScale;						// Principal point Y			---		  ---
+	// cameraMatrix.at<double>(2, 2) = 1.0;						// Just a 1 cause why not
+    cameraMatrix.at<double>(0, 0) = 1693.87882/imageScale;						// Focal length X				| fx  0  cx |
+	cameraMatrix.at<double>(1, 1) = 1695.69754/imageScale;						// Focal length Y				| 0  fy  cy |
+	cameraMatrix.at<double>(0, 2) = 1009.89572/imageScale;						// Principal point X			| 0   0   1 |
+	cameraMatrix.at<double>(1, 2) = 507.91942/imageScale;						// Principal point Y			---		  ---
 	cameraMatrix.at<double>(2, 2) = 1.0;						// Just a 1 cause why not
+
 #else
     cameraMatrix.at<double>(0, 0) = 718.8560/imageScale;					// Focal length X				| fx  0  cx |
     cameraMatrix.at<double>(1, 1) = 718.8560/imageScale;					// Focal length Y				| 0  fy  cy |
@@ -61,11 +67,11 @@ void VO::visualodometry()
     char filename2[100];
 
 #ifndef KITTI_DATASET
-    sprintf(filename1, "%simg_%05d.png", imagePath, STARTFRAME);
-    sprintf(filename2, "%simg_%05d.png", imagePath, STARTFRAME+1);
+    sprintf(filename1, "%s%04d.png", imagePath, STARTFRAME);
+    sprintf(filename2, "%s%04d.png", imagePath, STARTFRAME+1);
 #else
-    sprintf(filename1, "%s00%04d.png", imagePath, STARTFRAME);
-    sprintf(filename2, "%s00%04d.png", imagePath, STARTFRAME+1);
+    sprintf(filename1, "%s%04d.png", imagePath, STARTFRAME);
+    sprintf(filename2, "%s%04d.png", imagePath, STARTFRAME+1);
 #endif
 
     Mat firstImage = imread(filename1);
@@ -120,7 +126,7 @@ void VO::findPoses(cv::Mat lastImage, std::vector<cv::Point2f>& points1, std::ve
     int thickness = 1;
     cv::Point textOrg(10, 50);
 
-    Mat matOut = Mat::zeros(960, 600, CV_64FC3);
+    Mat matOut = Mat::zeros(960, 600, CV_64FC3);;
 
     // window
     namedWindow("VO trajectory", WINDOW_AUTOSIZE);
@@ -132,7 +138,7 @@ void VO::findPoses(cv::Mat lastImage, std::vector<cv::Point2f>& points1, std::ve
     {
         // load the current image
 #ifndef KITTI_DATASET
-        sprintf(nextimage, "%simg_%05d.png", imagePath, i);
+        sprintf(nextimage, "%s%04d.png", imagePath, i);
 #else
         sprintf(nextimage, "%s00%04d.png", imagePath, i);
 #endif
@@ -207,15 +213,16 @@ void VO::featureDetection(cv::Mat img1, std::vector<cv::Point2f>& points1, cv::M
     else if (vo_method == VO_METHOD_SIFT)
     {
         // frame mask
-        Mat img_maskUpperPart = Mat::zeros(img1.size(), CV_8U);
-        Mat img_roiUpperPart (img_maskUpperPart, Rect(0, 0, img1.cols, img1.rows/2));
-        img_roiUpperPart = Scalar(255, 255, 255);
-        Mat img_maskRightPart = Mat::zeros(img1.size(), CV_8U);
-        Mat img_roiRightPart (img_maskRightPart, Rect(img1.cols*3/5, img1.rows/2, img1.cols*2/5, img1.rows*2/5));
-        img_roiRightPart = Scalar(255, 255, 255);
-        Mat img_combinedMask = img_maskUpperPart | img_maskRightPart;
+//        Mat img_maskUpperPart = Mat::zeros(img1.size(), CV_8U);
+//        Mat img_roiUpperPart (img_maskUpperPart, Rect(0, 0, img1.cols, img1.rows/2));
+//        img_roiUpperPart = Scalar(255, 255, 255);
+//        Mat img_maskRightPart = Mat::zeros(img1.size(), CV_8U);
+//        Mat img_roiRightPart (img_maskRightPart, Rect(img1.cols*3/5, img1.rows/2, img1.cols*2/5, img1.rows*2/5));
+//        img_roiRightPart = Scalar(255, 255, 255);
+//        Mat img_combinedMask = img_maskUpperPart | img_maskRightPart;
 
-        siftDetection(img1, points1, img_combinedMask, img2, points2, img_combinedMask);
+//        siftDetection(img1, points1, img_combinedMask, img2, points2, img_combinedMask);
+        siftDetection(img1, points1, img2, points2);
     }
     // akaze
     else if (vo_method == VO_METHOD_AKAZE)
@@ -530,7 +537,7 @@ void VO::initParameter()
 
     /* 0 - fast,  1 - sift, 2 - surf,    3 - lukaskanade
        4 - akaze, 5 - orb,  6 - fastsift */
-    vo_method = 0;
+    vo_method = 1;
 
     // fast
     fast_threshold = 20;
@@ -539,7 +546,7 @@ void VO::initParameter()
     // surf
     min_hessian = 200;
     octave_layer = 3;
-    contrast_threshold = 0.004f;
+    contrast_threshold = 0.005f;
     edge_threshold = 20;
     sigma = 1.6;
 

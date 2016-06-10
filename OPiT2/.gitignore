@@ -1,9 +1,4 @@
 # Ignore build directory
-<<<<<<< HEAD
 /build/
 /buildx/
 /cloud/
-=======
-build/
-buildx/
->>>>>>> d7230b504ded9a52b2948eb00c4941adc08410de

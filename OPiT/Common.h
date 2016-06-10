@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 #include <thread>
-
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/core.hpp>
 
@@ -29,28 +28,34 @@ public:
     //timer
     void startTimer();
     void reportTimer();
+    void reportTimer(string);
+    void reportElapsedTime();
+    void reportElapsedTime(string);
 
     //logging
     static void createDir(const string dirname);
+    void readCsvTo3D2D(char *fileName, vector<Point3d> &worldPoints, vector<Point2d> &imagePoints);
 
     //preparemap
-    void prepareMap (char* mapCoordinateFile, char* mapKeypointsFile, vector<Point2d> &tunnel2Dx, vector<Point3d> &tunnel3Dx, Mat &tunnelDescriptor);
+    void prepareMap (string mapCoordinateFile, string mapKeypointsFile, vector<Point2d> &tunnel2Dx, vector<Point3d> &tunnel3Dx, Mat &tunnelDescriptor);
     void updatelut (vector<Point3d>, Mat, vector< pair<Point3d, Mat> > &);
-    void threading( int numofthreads, Mat T, Mat K, vector<KeyPoint> detectedkpts, Mat descriptor,
-                    pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::KdTreeFLANN<pcl::PointXYZ> &kdtree,
-                    vector<pair<Point3d, Mat> > &lookuptable, vector<Point3d> &tunnel3D, vector<Point2d> &tunnel2D, vector<int> &tunnel1D);
+    void threading(int numofthreads, Mat T, Mat K, vector<KeyPoint> detectedkpts, Mat descriptor,
+                   pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree,
+                   vector<pair<Point3d, Mat> > &lookuptable, vector<Point3d> &tunnel3D, vector<Point2d> &tunnel2D, vector<int> &tunnel1D);
     Mat getdescriptor (vector< pair<Point3d, Mat> >);
 
 private:
     high_resolution_clock::time_point t1, t2;
+    double elapsedTime;
+
     mutex                  g_mutex;
     void calcBestPoint ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
-                            pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree,
-                            int start, int end, int tidx,
-                            vector<pair<Point3d, Mat> > &vocabulary,
-                            vector<Point3d> &projected3D,
-                            vector<Point2d> &projected2D,
-                            vector<int> &projectedIndex);
+                    pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree,
+                    int start, int end, int tidx,
+                    vector<pair<Point3d, Mat> > &vocabulary,
+                    vector<Point3d> &projected3D,
+                    vector<Point2d> &projected2D,
+                    vector<int> &projectedIndex);
     vector<thread> workers;
 };
 

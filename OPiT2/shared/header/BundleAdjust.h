@@ -11,6 +11,8 @@
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 
+#include "Frame.h"
+
 #include <iostream>
 
 using namespace std;
@@ -19,25 +21,18 @@ using namespace cv;
 class BundleAdjust
 {
 public:
-    struct frameInfo
-    {
-        vector<Point2d> imagePoints;
-        vector<Point3d> worldPoints;
-        Mat             K;
-        Mat             R;
-        Mat             t;
-        Mat             distortCoef;
-    };
-
     BundleAdjust();
+    ~BundleAdjust();
 
-    void pushFrame (vector<Point2d>, vector<Point3d>, Mat, Mat, Mat, Mat);
-    void run();
+    void run(vector<Frame> &);
     void prepareData(vector<Point3d> &, vector<vector<Point2d> > &, vector<vector<int> > &,
                      vector<Mat> &, vector<Mat> &, vector<Mat> &, vector<Mat> &);
+    void updateData(vector<Point3d>, vector<Mat>, vector<Mat>, vector<Frame> &);
     int  getWindowSize();
 private:
-    vector<frameInfo> frameWindows;
+    cvsba::Sba          sba;
+    cvsba::Sba::Params  params;
+    vector<Frame>       trackedFrame;
 };
 
 #endif

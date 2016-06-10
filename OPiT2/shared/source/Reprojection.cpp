@@ -122,10 +122,10 @@ Mat Reprojection::foo(Mat frame1, Mat frame2, Mat rMat1, Mat rMat2, cv::Mat tVec
 */
 vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::KdTreeFLANN<pcl::PointXYZ> &kdtree)
 {
-    double THRESHOLD 	= 0.05;
-    double MIN_DIST 	= 15;
-    double MAX_DIST 	= 60;
-    double DELTA_Z 		= 0.05;
+    double THRESHOLD 	= 0.005;
+    double DELTA_Z 		= 0.1;
+    double MIN_DIST 	= 10;
+    double MAX_DIST 	= 80;
 
     vector<double> bestPoint{ 0, 0, 0, 1000 };
     Mat p, p_, p3d;
@@ -180,7 +180,7 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
          *		for finding the closest neighbour (point) in the point cloud.
          */
         newX = p_.at<double>(0, 0);	newY = p_.at<double>(1, 0); newZ = p_.at<double>(2, 0);
-        vector<double> newPoint = PCLCloudSearch::FindClosestPoint(newX, newY, newZ, cloud, kdtree);
+        vector<double> newPoint = PCLCloudSearch::FindClosestPoint(newX, newY, newZ, std::ref(cloud), std::ref(kdtree));
 
         /*
          *	As soon as we find a "good enough" point, return it,
@@ -201,68 +201,143 @@ vector<double> Reprojection::backproject(Mat T, Mat	K, Point2d imagepoint, pcl::
 // using radius instead
 vector<double> Reprojection::backprojectRadius(Mat T, Mat K, Point2d imagepoint, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree)
 {
-	double MIN_DIST = 10.0f;			// in pixel
-	double MAX_DIST = 100.0f;		// in pixel
-    double min_dist_L2;
-    double max_dist_L2;
-	double RADIUS = 0.05f;			// 5 centimeter
-	double THRESHOLD = 0.01f;		// 1 centimeter
-	double DELTA_Z;					// meter
+    double OFFSET       = 2.0f;             // meters
+    double MAXDIST      = 100.0f;            // meters
+    double DELTAZ       = 0.005f;           // meters
+    double THRESHOLD    = 0.01f;            // meters
 
-	vector<double> bestPoint;
-	Mat p, p_, p3d;
-	double newX, newY, newZ;
+    vector<double> bestPoint{ 0, 0, 0, 1000 };
 
-	// setup the camera origin in world coordinate
-	Mat origin_p = (Mat_<double>(3,1) << 0, 0, 0);
-	Mat origin_c = K.inv() * origin_p;
-	Mat origin_w = T * (Mat_<double>(4, 1) << origin_c.at<double>(0,0), origin_c.at<double>(1,0), origin_c.at<double>(2,0), 1);
+    // all variables here use different coordinates, e.g. image (p_xxx), camera (c_xxx) and world (c_xxx) coordinates.
 
-	// determine the DELTA_Z or distance between each search
-	// for each search point X with search radius r, if we got no best point, then we have to move
-	// the search point X+l distance. this l distance should be < 2r in order to handle possibility
-	// of the best point that is located right outside the intersection area of two search areas.
-	// more here:
-	//		http://mathworld.wolfram.com/Circle-CircleIntersection.html
+    // set the origin first in world coordinate, the origin will be the starting point for the rays
+    // Mat p_origin = (Mat_<double>(3,1) << 0, 0, 0);
+    Mat c_origin = (Mat_<double>(4,1) << 0, 0, 0, 1);
+    Mat w_origin = T * (Mat_<double>(4,1) << c_origin.at<double>(0,0), c_origin.at<double>(1,0), c_origin.at<double>(2,0), 1 /* normalization, added 1 */);
 
-	// update the DELTA_Z (in meter)
-	DELTA_Z = 2 * sqrt (pow(RADIUS, 2) - pow(THRESHOLD, 2));
+    // now looking for the minimum distance (in meter)
+    // it is obtained by calculating the world coordinates of the furthest point (obviously, the corner pixel).
+    // the corner pixel is stored in camera intrinsic matrix K, element (0,2) for x and element (1,2) for y.
+    // to get the furthest points of x and y, those value need to be multiplied by 2
+    Mat p_corner = (Mat_<double>(3,1) << K.at<double>(0,2)*2, K.at<double>(1,2)*2, 1);
+    Mat c_corner = K.inv() * p_corner;
+    Mat w_corner = T * (Mat_<double>(4,1) << c_corner.at<double>(0,0), c_corner.at<double>(1,0), c_corner.at<double>(2,0), 1);
 
-	// find where this MIN_DIST and MAX_DIST in meter according to the imagepoint coordinate which still in pixels
-	Mat mindist_p = (Mat_<double>(3,1) << imagepoint.x, imagepoint.y, MIN_DIST);
-	Mat mindist_c = K.inv() * mindist_p;
-	Mat mindist_w = T * (Mat_<double>(4,1) << mindist_c.at<double>(0,0), mindist_c.at<double>(1,0), mindist_c.at<double>(2,0), 1);
+//    double min_dist = cv::norm(Point3d(w_corner.at<double>(0,0)-w_origin.at<double>(0,0),
+//                                       w_corner.at<double>(1,0)-w_origin.at<double>(1,0),
+//                                       w_corner.at<double>(2,0)-w_origin.at<double>(2,0)));
 
-	// find where this MIN_DIST and MAX_DIST in meter according to the imagepoint coordinate which still in pixels
-	Mat maxdist_p = (Mat_<double>(3,1) << imagepoint.x, imagepoint.y, MAX_DIST);
-	Mat maxdist_c = K.inv() * maxdist_p;
-	Mat maxdist_w = T * (Mat_<double>(4,1) << maxdist_c.at<double>(0,0), maxdist_c.at<double>(1,0), maxdist_c.at<double>(2,0), 1);
+	Mat p_feature;
+	Mat c_feature;
+	Mat w_feature;
 
-    // create a vector, start from the origin_w to mindist_w
-    Mat ray_w     = mindist_w - origin_w;
+    // the backprojection starts from the w_feature position + an offset
+    double scalarSearchDist = OFFSET;
 
-    min_dist_L2 = norm(origin_w, mindist_w, NORM_L2);
-    max_dist_L2 = norm(origin_w, maxdist_w, NORM_L2);
-
-    for (double i = min_dist_L2; i < max_dist_L2; i += DELTA_Z)
+    while (scalarSearchDist < MAXDIST)
     {
-        // calculation of the search point should be like this
-        Mat sPoint = mindist_w + i * ray_w;
+        // bring the current feature (p_feature) from image coordinate into worl coordinate
+		p_feature = (Mat_<double>(3,1) << imagepoint.x, imagepoint.y, 1);
+		c_feature = K.inv() * p_feature;
+		w_feature = T * (Mat_<double>(4,1) << c_feature.at<double>(0,0), c_feature.at<double>(1,0), c_feature.at<double>(2,0), 1);
 
-		//cout << i << endl;
-		//cout << sPoint << endl;
+        // create a vector between 2 points, w_origin and each features (w_feature)
+        Mat vectorOtoF = w_feature - w_origin;
 
-        newX = sPoint.at<double>(0,0); newY = sPoint.at<double>(1,0), newZ = sPoint.at<double>(2,0);
-        bestPoint = PCLCloudSearch::FindClosestPointRadius(	newX, newY, newZ, RADIUS, THRESHOLD,
-                                                            std::ref(cloud), std::ref(kdtree),
-                                                            origin_w);
+        double scalarOtoF = cv::norm(Point3d(w_feature.at<double>(0,0)-w_origin.at<double>(0,0),
+                                             w_feature.at<double>(1,0)-w_origin.at<double>(1,0),
+                                             w_feature.at<double>(2,0)-w_origin.at<double>(2,0)));
 
-		// return current bestPoint to the upper stack if the lerp distance is less than 1000.0f (default)
-        if (bestPoint[3] < 1000)
+        // the searching point in world coordinate is represented by this equation
+        //      w_searchPoint = w_feature + (scalarSearchDist/scalarOtoF) * vectorOtoF;
+        Mat w_searchPoint = w_feature + (scalarSearchDist/scalarOtoF) * vectorOtoF;
+
+        // perform the searching using PCL
+        vector<double> newPoint = PCLCloudSearch::FindClosestPoint(w_searchPoint.at<double>(0,0),
+                                                                   w_searchPoint.at<double>(1,0),
+                                                                   w_searchPoint.at<double>(2,0),
+                                                                   std::ref(cloud),
+                                                                   std::ref(kdtree));
+
+        // perform the linear interpolation (orthogonal projection of the nearest point from the searching point into the ray)
+        if (newPoint[3] < THRESHOLD)
+        {
+            // return the lerp
+            bestPoint = LinearInterpolation (newPoint, w_origin, w_searchPoint);
+
             break;
+        }
+
+        // increment the search distant by DELTAZ distance
+        scalarSearchDist += DELTAZ;
     }
 
-	return bestPoint;
+    // return the bestPoint
+    return bestPoint;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+//	double MIN_DIST = 10.0f;			// in pixel
+//	double MAX_DIST = 100.0f;		// in pixel
+//    double min_dist_L2;
+//    double max_dist_L2;
+//	double RADIUS = 0.05f;			// 5 centimeter
+//	double THRESHOLD = 0.01f;		// 1 centimeter
+//	double DELTA_Z;					// meter
+//
+//	vector<double> bestPoint;
+//	Mat p, p_, p3d;
+//	double newX, newY, newZ;
+//
+//	// setup the camera origin in world coordinate
+//	Mat origin_p = (Mat_<double>(3,1) << 0, 0, 0);
+//	Mat origin_c = K.inv() * origin_p;
+//	Mat origin_w = T * (Mat_<double>(4, 1) << origin_c.at<double>(0,0), origin_c.at<double>(1,0), origin_c.at<double>(2,0), 1);
+//
+//	// determine the DELTA_Z or distance between each search
+//	// for each search point X with search radius r, if we got no best point, then we have to move
+//	// the search point X+l distance. this l distance should be < 2r in order to handle possibility
+//	// of the best point that is located right outside the intersection area of two search areas.
+//	// more here:
+//	//		http://mathworld.wolfram.com/Circle-CircleIntersection.html
+//
+//	// update the DELTA_Z (in meter)
+//	DELTA_Z = 2 * sqrt (pow(RADIUS, 2) - pow(THRESHOLD, 2));
+//
+//	// find where this MIN_DIST and MAX_DIST in meter according to the imagepoint coordinate which still in pixels
+//	Mat mindist_p = (Mat_<double>(3,1) << imagepoint.x, imagepoint.y, MIN_DIST);
+//	Mat mindist_c = K.inv() * mindist_p;
+//	Mat mindist_w = T * (Mat_<double>(4,1) << mindist_c.at<double>(0,0), mindist_c.at<double>(1,0), mindist_c.at<double>(2,0), 1);
+//
+//	// find where this MIN_DIST and MAX_DIST in meter according to the imagepoint coordinate which still in pixels
+//	Mat maxdist_p = (Mat_<double>(3,1) << imagepoint.x, imagepoint.y, MAX_DIST);
+//	Mat maxdist_c = K.inv() * maxdist_p;
+//	Mat maxdist_w = T * (Mat_<double>(4,1) << maxdist_c.at<double>(0,0), maxdist_c.at<double>(1,0), maxdist_c.at<double>(2,0), 1);
+//
+//    // create a vector, start from the origin_w to mindist_w
+//    Mat ray_w     = mindist_w - origin_w;
+//
+//    min_dist_L2 = norm(origin_w, mindist_w, NORM_L2);
+//    max_dist_L2 = norm(origin_w, maxdist_w, NORM_L2);
+//
+//    for (double i = min_dist_L2; i < max_dist_L2; i += DELTA_Z)
+//    {
+//        // calculation of the search point should be like this
+//        Mat sPoint = mindist_w + i * ray_w;
+//
+//		//cout << i << endl;
+//		//cout << sPoint << endl;
+//
+//        newX = sPoint.at<double>(0,0); newY = sPoint.at<double>(1,0), newZ = sPoint.at<double>(2,0);
+//        bestPoint = PCLCloudSearch::FindClosestPointRadius(	newX, newY, newZ, RADIUS, THRESHOLD,
+//                                                            std::ref(cloud), std::ref(kdtree),
+//                                                            origin_w);
+//
+//		// return current bestPoint to the upper stack if the lerp distance is less than 1000.0f (default)
+//        if (bestPoint[3] < 1000)
+//            break;
+//    }
 }
 
 vector<double> Reprojection::LinearInterpolation(vector<double> bestPoint, Mat origin, Mat vectorPoint)

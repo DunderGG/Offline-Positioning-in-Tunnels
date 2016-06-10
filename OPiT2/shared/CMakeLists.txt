@@ -9,7 +9,20 @@ if (TARGET shared)
     message ("shared library is already defined")
 else()
     include_directories (${SHARED_INCLUDE_DIR})
-    set (LIB_SOURCES    ./source/Calibration.cpp
+    set (LIB_SOURCES    ./header/Calibration.h
+                        ./header/Converter.h
+                        ./header/FeatureDetection.h
+                        ./header/ManualCorrespondences.h
+                        ./header/PCLCloudSearch.h
+                        ./header/PnPSolver.h
+                        ./header/PointProjection.h
+                        ./header/Reprojection.h
+                        ./header/VisualOdometry.h
+                        ./header/Common.h
+                        ./header/BundleAdjust.h
+                        ./header/Frame.h
+
+                        ./source/Calibration.cpp
                         ./source/Converter.cpp
                         ./source/FeatureDetection.cpp
                         ./source/ManualCorrespondences.cpp
@@ -17,10 +30,11 @@ else()
                         ./source/PnPSolver.cpp
                         ./source/PointProjection.cpp
                         ./source/Reprojection.cpp
-                        ./source/Triangulation.cpp
                         ./source/VisualOdometry.cpp
                         ./source/Common.cpp
-                        ./source/Log.cpp
-                        ./source/BundleAdjust.cpp)
+                        ./source/BundleAdjust.cpp
+                        ./source/Frame.cpp)
+                        #./source/Triangulation.cpp
+                        #./source/Log.cpp
     add_library (shared ${LIB_SOURCES})
 endif()

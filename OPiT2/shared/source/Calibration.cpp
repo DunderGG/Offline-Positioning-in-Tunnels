@@ -18,12 +18,17 @@ using namespace std;
 Calibration::Calibration()										// WE HAVE TO TAKE DISTORTION INTO ACCOUNT!
 {																//							    Camera matrix
 	cameraMatrix = Mat(3, 3, CV_64FC1, Scalar::all(0));			//								___		  ___
-	cameraMatrix.at<double>(0, 0) = 1432;						// Focal length X				| fx  0  cx |
-	cameraMatrix.at<double>(1, 1) = 1432;						// Focal length Y				| 0  fy  cy |
-	cameraMatrix.at<double>(0, 2) = 640;						// Principal point X			| 0   0   1 |
-	cameraMatrix.at<double>(1, 2) = 481;						// Principal point Y			---		  ---
-	cameraMatrix.at<double>(2, 2) = 1.0;						// Just a 1 cause why not	
-
+    cameraMatrix.at<double>(0, 0) = 1432;						// Focal length X				| fx  0  cx |
+    cameraMatrix.at<double>(1, 1) = 1432;						// Focal length Y				| 0  fy  cy |
+    cameraMatrix.at<double>(0, 2) = 640;						// Principal point X			| 0   0   1 |
+    cameraMatrix.at<double>(1, 2) = 481;						// Principal point Y			---		  ---
+    cameraMatrix.at<double>(2, 2) = 1.0;						// Just a 1 cause why not
+//	cameraMatrix.at<double>(0, 0) = 1693.87882;						// Focal length X				| fx  0  cx |
+//	cameraMatrix.at<double>(1, 1) = 1695.69754;						// Focal length Y				| 0  fy  cy |
+//	cameraMatrix.at<double>(0, 2) = 1009.89572;						// Principal point X			| 0   0   1 |
+//	cameraMatrix.at<double>(1, 2) = 507.91942;						// Principal point Y			---		  ---
+//	cameraMatrix.at<double>(2, 2) = 1.0;						// Just a 1 cause why not
+//	distortionCoeffs = (Mat1d(5,1) << -0.28197, 0.11386, 0.00131, 0.0013, 0.0000);
 
 	setVoVImagePoints();
 	setVoVWorldPoints();
@@ -53,7 +58,7 @@ Mat Calibration::foo( vector<vector<Point2f> > vovIP, vector<vector<Point3f> > v
 		cm,								// Output camera matrix, but we have already defined ours
 		distCoeffs,						// The distortion coeffiecients for the camera
 		rvec, tvec,						//
-		CV_CALIB_USE_INTRINSIC_GUESS);	// Optional flags	
+		CV_CALIB_USE_INTRINSIC_GUESS);	// Optional flags
 
 
 	return distCoeffs;
@@ -74,7 +79,7 @@ Mat Calibration::foo()
 		cameraMatrix,					// Output camera matrix, but we have already defined ours
 		Calibration::distortionCoeffs,	// The distortion coeffiecients for the camera
 		rvec, tvec,						//
-		CV_CALIB_USE_INTRINSIC_GUESS);	// Optional flags	
+		CV_CALIB_USE_INTRINSIC_GUESS);	// Optional flags
 
 										// Calculate time
 

@@ -19,14 +19,18 @@
 
 #include "Reprojection.h"
 
+#define FLT_THRESHOLD   1.192092896e-07F
+
+
 using namespace std;
 using namespace std::chrono;
 using namespace cv;
 
+
 // constructor
 Common::Common()
 {
-
+    elapsedTime = 0;
 }
 
 // destructor()
@@ -46,7 +50,26 @@ void Common::reportTimer()
 {
     t2 = high_resolution_clock::now();
     auto duration1 = duration_cast<milliseconds> (t2-t1).count();
-    cout << "  finish in " << duration1 << "ms (" << duration1/1000 << " sec)\n" << endl;
+    elapsedTime += duration1;
+    cout << "  finished in " << duration1 << "ms (" << duration1/1000 << " sec)" << endl;
+}
+
+void Common::reportTimer(string verbose)
+{
+    t2 = high_resolution_clock::now();
+    auto duration1 = duration_cast<milliseconds> (t2-t1).count();
+    elapsedTime += duration1;
+    cout << "  " << verbose << " finished in " << duration1 << "ms (" << duration1/1000 << " sec)" << endl;
+}
+
+void Common::reportElapsedTime()
+{
+    cout << "  finished in " << elapsedTime << "ms (" << elapsedTime/1000 << " sec)" << endl;
+}
+
+void Common::reportElapsedTime(string verbose)
+{
+    cout << "  " << verbose << " finished in " << elapsedTime << "ms (" << elapsedTime/1000 << " sec)" << endl;
 }
 
 // log
@@ -60,7 +83,7 @@ void  Common::createDir(const string dirname)
 }
 
 // prepare map
-void Common::prepareMap (char* mapCoordinateFile, char* mapKeypointsFile, vector<Point2d> &tunnel2Dx, vector<Point3d> &tunnel3Dx, Mat &tunnelDescriptor)
+void Common::prepareMap (string mapCoordinateFile, string mapKeypointsFile, vector<Point2d> &tunnel2Dx, vector<Point3d> &tunnel3Dx, Mat &tunnelDescriptor)
 {
     // load descriptor
     string line;
@@ -100,6 +123,51 @@ void Common::prepareMap (char* mapCoordinateFile, char* mapKeypointsFile, vector
     lstorage.release();
 }
 
+void Common::readCsvTo3D2D(char *fileName, vector<Point3d> &worldPoints, vector<Point2d> &imagePoints)
+{
+    string line;
+    ifstream file;
+
+    // open the file
+    file.open(fileName);
+
+    // temporary output
+    double x=0,y=0,z=0,u=0,v=0;
+
+    if (file.is_open())
+    {
+        while (getline(file, line) && !file.eof())
+        {
+            istringstream in(line);
+            string token;
+
+            int rowCounter = 0;
+            while (getline(in, token, ','))
+            {
+                if (rowCounter==0)
+                    x = stod(token);
+                if (rowCounter==1)
+                    y = stod(token);
+                if (rowCounter==2)
+                    z = stod(token);
+                if (rowCounter==3)
+                    u = stod(token);
+                if (rowCounter==4)
+                    v = stod(token);
+
+                rowCounter++;
+            }
+
+            worldPoints.push_back(Point3d(x,y,z));
+            imagePoints.push_back(Point2d(u,v));
+        }
+    }
+    file.close();
+}
+
+/* ---------------------------------------------------------------------------------------------------------
+    lookup table tools
+   ---------------------------------------------------------------------------------------------------------*/
 void Common::updatelut (vector<Point3d> point3D, Mat descriptor, vector< pair<Point3d, Mat> > &lookuptable)
 {
     for (int h = 0; h < point3D.size(); h++)
@@ -116,6 +184,11 @@ Mat Common::getdescriptor (vector< pair<Point3d, Mat> > lookuptable)
 
     return descriptorTemp;
 }
+
+
+/* ---------------------------------------------------------------------------------------------------------
+    multithreading support for backprojection
+   ---------------------------------------------------------------------------------------------------------*/
 
 void Common::calcBestPoint ( Mat T, Mat K, vector<KeyPoint> imagepoint, Mat descriptor,
                         pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::KdTreeFLANN<pcl::PointXYZ>& kdtree,
@@ -158,5 +231,4 @@ void Common::threading( int numofthreads, Mat T, Mat K, vector<KeyPoint> detecte
                                                                 std::ref(lookuptable), std::ref(tunnel3D), std::ref(tunnel2D), std::ref(tunnel1D)));
     }
     for (int tidx = 0; tidx < numofthreads; tidx ++) {workers[tidx].join();} workers.clear();
-
 }

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <vector>
 
 #include <opencv2/features2d.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
@@ -8,14 +9,16 @@
 
 #include "VisualOdometry.h"
 #include "PCLCloudSearch.h"
+#include "Common.h"
 
 using namespace std;
 using namespace cv;
 
+/* -------------------------------------------------------------------------------------------------------------------------------------------- */
 int main ()
 {
     #ifndef KITTI_DATASET
-       char pathname[100] = "/Users/januaditya/Thesis/exjobb-data/volvo/out0/";
+       char pathname[100] = "/Users/januaditya/Desktop/thesis/gopro/frames-lundby/";
     #else
        char pathname[100] = "/Users/januaditya/Thesis/exjobb-data/kitti-odometry/dataset/sequences/00/image_0/";
     #endif

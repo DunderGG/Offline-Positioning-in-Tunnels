@@ -12,8 +12,6 @@ public:
 private:
 	std::vector<cv::Point2f> projectionImagePoints;
 	cv::Mat projectionJacobian;
-
-
 };
 
 #endif
